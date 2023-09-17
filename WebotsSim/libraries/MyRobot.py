@@ -1,3 +1,5 @@
+import math
+
 from WebotsSim.libraries.RobotLib.RosBot import RosBot
 
 
@@ -40,18 +42,35 @@ class MyRobot(RosBot):
             self.advance()
         self.stop()
 
-    # Move in an arc a given distance with a certain radius - clock direction
+    # Move in an arc a given distance (m) with a certain radius (m) - clock direction
     # will be determined by sign of radius:
     # +/- = clockwise/counterclockwise
-    def move_arc(self, distance, radius):
+    def move_arc_distance(self, distance, radius):
         current_ae = (self.relative_fre() + self.relative_fle()) / 2
-        sign = 1 if radius >= 0 else -1
-        if radius < 0:
-            radius *= -1
-        velocity_outer = self.angular_speed_pref * (radius + (self.axel_length/2))
-        velocity_inner = self.angular_speed_pref * (radius - (self.axel_length/2))
+        sign = 1 if radius >= 0 else 0
+        radius = math.fabs(radius)
+        velocity_outer = radius + (self.axel_length/2)
+        velocity_inner = radius - (self.axel_length/2)
+        # Normalize velocity to angular speed pref and adjust inner and outer accordingly
+        mult = self.angular_speed_pref / ((velocity_outer + velocity_inner)/2)
+        velocity_outer *= mult
+        velocity_inner *= mult
+        if sign:
+            self.set_left_motors_velocity(velocity_outer)
+            self.set_right_motors_velocity(velocity_inner)
+        else:
+            self.set_right_motors_velocity(velocity_outer)
+            self.set_left_motors_velocity(velocity_inner)
+        # Move until distance quota met
+        while ((self.relative_fre() + self.relative_fle())/2 - current_ae) * self.wheel_radius <= distance - self.linear_precision_pref:
+            self.advance()
+        self.stop()
 
-        return
+# Traverse an arc, calculating the distance to be traveled based on the angle (deg) and radius (m) passed
+    def move_arc_angle(self, angle, radius):
+        rads = angle * (math.pi / 180)
+        distance = math.fabs(rads * radius)
+        self.move_arc_distance(distance, radius)
 
     # Rotate inplace by a specified angle (in degrees):
     # + clockwise/- counterclockwise
