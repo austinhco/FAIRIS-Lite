@@ -23,7 +23,8 @@ robot.initial_fle = robot.get_front_left_motor_encoder_reading()
 robot.initial_fre = robot.get_front_right_motor_encoder_reading()
 
 # Set calculation parameters
-robot.speed_pref = 15
+robot.speed_pref = 5
+robot.rotational_speed_pref = 1
 
 # Movement Script
-robot.move_linear(2)
+robot.rotate(+270)

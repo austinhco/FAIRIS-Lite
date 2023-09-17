@@ -8,21 +8,17 @@ class MyRobot(RosBot):
 
     # Speed preference (radians per second, converts to ~)
     speed_pref = 5
+    rotational_speed_pref = 1
     # Movement precision preference (in meters)
-    precision_pref = 0.005
+    linear_precision_pref = 0.005
+    # Rotational precision preference (in degrees)
+    angular_precision_pref = 1
 
     # Basal Sensor Readings
     initial_fle = 0
     initial_fre = 0
 
-    # ERROR: No attribute "device" - tedium, activate
-    # You should insert a getDevice-like function in order to get the
-    # instance of a device of the robot. Something like:
-    #  motor = robot.getDevice('motorname')
-    #  ds = robot.getDevice('dsname')
-    #  ds.enable(timestep)
-
-    # Advance time (returns -1 when simulator calls for stop)
+    # Advance time (unless stop signal)
     def advance(self):
         if self.step(int(self.getBasicTimeStep())) == -1:
             exit(0)
@@ -41,7 +37,7 @@ class MyRobot(RosBot):
         # range of target distance
         self.set_right_motors_velocity(self.speed_pref)
         self.set_left_motors_velocity(self.speed_pref)
-        while (self.relative_fre() + self.relative_fle() - current_ae) / 2 * self.wheel_radius <= distance - self.precision_pref:
+        while (self.relative_fre() + self.relative_fle() - current_ae) / 2 * self.wheel_radius <= distance - self.linear_precision_pref:
             self.advance()
         self.stop()
 
@@ -52,19 +48,29 @@ class MyRobot(RosBot):
 
     # Rotate inplace by a specified angle (in degrees):
     # + clockwise/- counterclockwise
+    # Rotation angles above 180deg will be cut or redirected to the minimal path
     def rotate(self, angle):
+        # Rectify input
+        while angle > 180:
+            angle -= 360
+        while angle < -180:
+            angle += 360
+        # Ascertain target
         initial_angle = self.get_compass_reading()
-        target_angle = initial_angle + angle
-        print(target_angle)
-        # Rotate inplace until within acceptable range of target angle
-        while 1:
-            if angle > 0 and self.get_compass_reading() <= target_angle - self.precision_pref:
-                self.set_right_motors_velocity(self.speed_pref)
-                self.set_left_motors_velocity(-self.speed_pref)
-            elif angle < 0 and self.get_compass_reading() >= target_angle + self.precision_pref:
-                self.set_right_motors_velocity(-self.speed_pref)
-                self.set_left_motors_velocity(self.speed_pref)
-            else:
-                break
+        target_angle = initial_angle - angle
+        if target_angle > 360:
+            target_angle -= 360
+        elif target_angle < 0:
+            target_angle += 360
+        # Rotate depending on sign
+        while not (target_angle - self.angular_precision_pref < self.get_compass_reading() < target_angle + self.angular_precision_pref):
+            if angle > 0:
+                self.set_left_motors_velocity(self.rotational_speed_pref)
+                self.set_right_motors_velocity(-self.rotational_speed_pref)
+            elif angle < 0:
+                self.set_left_motors_velocity(-self.rotational_speed_pref)
+                self.set_right_motors_velocity(self.rotational_speed_pref)
             self.advance()
-        self.stop()
+
+
+
