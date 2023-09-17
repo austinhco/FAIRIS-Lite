@@ -12,8 +12,11 @@ class MyRobot(RosBot):
     speed_pref = 5  # radians per second per wheel
     angular_speed_pref = 2  # radians per second relative to ICC
     rotational_speed_pref = 1  # radians per second per wheel
-    linear_precision_pref = 0.005  # meters
+    linear_precision_pref = 0.001  # meters
     angular_precision_pref = 1  # degrees
+    braking_distance = 0.25  # meters
+    braking_velocity = 1  # radians per second per wheel
+    angular_braking_velocity = 1
 
     # Basal Sensor Readings
     initial_fle = 0
@@ -39,6 +42,9 @@ class MyRobot(RosBot):
         self.set_right_motors_velocity(self.speed_pref)
         self.set_left_motors_velocity(self.speed_pref)
         while ((self.relative_fre() + self.relative_fle())/2 - current_ae) * self.wheel_radius <= distance - self.linear_precision_pref:
+            if ((self.relative_fre() + self.relative_fle())/2 - current_ae) * self.wheel_radius >= distance - self.linear_precision_pref - self.braking_distance:
+                self.set_right_motors_velocity(self.braking_velocity)
+                self.set_left_motors_velocity(self.braking_velocity)
             self.advance()
         self.stop()
 
@@ -46,6 +52,8 @@ class MyRobot(RosBot):
     # will be determined by sign of radius:
     # +/- = clockwise/counterclockwise
     def move_arc_distance(self, distance, radius):
+        # Hack away a silly little precision error
+        distance += (math.pi / 180)
         current_ae = (self.relative_fre() + self.relative_fle()) / 2
         sign = 1 if radius >= 0 else 0
         radius = math.fabs(radius)
@@ -53,16 +61,22 @@ class MyRobot(RosBot):
         velocity_inner = radius - (self.axel_length/2)
         # Normalize velocity to angular speed pref and adjust inner and outer accordingly
         mult = self.angular_speed_pref / ((velocity_outer + velocity_inner)/2)
-        velocity_outer *= mult
-        velocity_inner *= mult
+        brake_mult = self.angular_braking_velocity / ((velocity_outer + velocity_inner)/2)
         if sign:
-            self.set_left_motors_velocity(velocity_outer)
-            self.set_right_motors_velocity(velocity_inner)
+            self.set_left_motors_velocity(velocity_outer * mult)
+            self.set_right_motors_velocity(velocity_inner * mult)
         else:
-            self.set_right_motors_velocity(velocity_outer)
-            self.set_left_motors_velocity(velocity_inner)
+            self.set_right_motors_velocity(velocity_outer * mult)
+            self.set_left_motors_velocity(velocity_inner * mult)
         # Move until distance quota met
         while ((self.relative_fre() + self.relative_fle())/2 - current_ae) * self.wheel_radius <= distance - self.linear_precision_pref:
+            if ((self.relative_fre() + self.relative_fle())/2 - current_ae) * self.wheel_radius >= distance - self.linear_precision_pref - self.braking_distance:
+                if sign:
+                    self.set_left_motors_velocity(velocity_outer * brake_mult)
+                    self.set_right_motors_velocity(velocity_inner * brake_mult)
+                else:
+                    self.set_right_motors_velocity(velocity_outer * brake_mult)
+                    self.set_left_motors_velocity(velocity_inner * brake_mult)
             self.advance()
         self.stop()
 
