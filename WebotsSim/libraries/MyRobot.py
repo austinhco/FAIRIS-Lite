@@ -11,6 +11,10 @@ class MyRobot(RosBot):
     # Movement precision preference (in meters)
     precision_pref = 0.005
 
+    # Basal Sensor Readings
+    initial_fle = 0
+    initial_fre = 0
+
     # ERROR: No attribute "device" - tedium, activate
     # You should insert a getDevice-like function in order to get the
     # instance of a device of the robot. Something like:
@@ -24,20 +28,20 @@ class MyRobot(RosBot):
             exit(0)
 
     # Get relative total distance traveled based on initial encoder readings
-    def get_fle(self):
-        return self.get_front_left_motor_encoder_reading()
+    def relative_fle(self):
+        return self.get_front_left_motor_encoder_reading() - self.initial_fre
 
-    def get_fre(self):
-        return self.get_front_right_motor_encoder_reading()
+    def relative_fre(self):
+        return self.get_front_right_motor_encoder_reading() - self.initial_fre
 
     # Move forward a given distance (in m), calculated via sensor readings, NOT TIME
     def move_linear(self, distance):
-        current_ae = (self.get_fre() + self.get_fle()) / 2
+        current_ae = (self.relative_fre() + self.relative_fle()) / 2
         # Move forward until average encoder reading is within acceptable
         # range of target distance
         self.set_right_motors_velocity(self.speed_pref)
         self.set_left_motors_velocity(self.speed_pref)
-        while (self.get_fre() + self.get_fle() - current_ae) * self.wheel_radius <= distance - self.precision_pref:
+        while (self.relative_fre() + self.relative_fle() - current_ae) / 2 * self.wheel_radius <= distance - self.precision_pref:
             self.advance()
         self.stop()
 

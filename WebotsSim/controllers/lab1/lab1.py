@@ -18,5 +18,12 @@ maze_file = 'worlds/mazes/Labs/Lab1/Lab1.xml'
 robot.load_environment(maze_file)
 robot.move_to_start()
 
+# Set basal readings
+robot.initial_fle = robot.get_front_left_motor_encoder_reading()
+robot.initial_fre = robot.get_front_right_motor_encoder_reading()
+
+# Set calculation parameters
+robot.speed_pref = 15
+
 # Movement Script
-robot.move_linear(4)
+robot.move_linear(2)
