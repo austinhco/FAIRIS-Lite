@@ -25,9 +25,17 @@ Floor {
   tileSize 2 2
 }
 DEF Agent Rosbot {
-  translation 3.068860920170147e-12 -1.3155904555854636e-09 -0.000562585249692632
-  rotation -1.584138066379736e-05 1.596003898658653e-05 0.9999999997471639 1.5700000002428123
-  controller "Template"
+  hidden position_0_0 35.280531919493505
+  hidden position_0_1 35.280459200310496
+  hidden position_0_2 35.28069255023634
+  hidden position_0_3 35.28227113888905
+  hidden rotation_2 0 -1 0 2.4185799235840135
+  hidden rotation_3 0 -1 0 2.418652642767023
+  hidden rotation_4 0 -1 0 2.4184192928411803
+  hidden rotation_5 0 -1 0 2.4168407041884676
+  translation 1.5000003627421252 -1.4996028049342007 -0.0005650906356551577
+  rotation -0.00014725410187530798 0.00014717351662425462 0.9999999783280925 1.5707965952863938
+  controller "<extern>"
   supervisor TRUE
   cameraSlot [
     ROSbot_Camera {
@@ -48,4 +56,95 @@ DEF Agent Rosbot {
     GPS {
     }
   ]
+}
+DEF Obstacle_0 Obstacle {
+  translation 1 -0.5 0.25
+  rotation 0 0 1 3.14
+  size 0.01 3 0.5
+}
+DEF Obstacle_1 Obstacle {
+  translation 0 1 0.25
+  rotation 0 0 1 -1.57
+  name "Obstacle(1)"
+  size 0.01 2 0.5
+}
+DEF Obstacle_2 Obstacle {
+  translation -1 0 0.25
+  rotation 0 0 1 -1.57
+  name "Obstacle(2)"
+  size 0.01 2 0.5
+}
+DEF Obstacle_3 Obstacle {
+  translation 0 -1 0.25
+  rotation 0 0 1 -1.57
+  name "Obstacle(3)"
+  size 0.01 2 0.5
+}
+DEF Boundary_Wall0 Obstacle {
+  translation 0 -2 0.25
+  rotation 0 0 1 -1.57
+  name "Obstacle(4)"
+  size 0.01 4 0.5
+}
+DEF Boundary_Wall1 Obstacle {
+  translation 0 2 0.25
+  rotation 0 0 1 -1.57
+  name "Obstacle(5)"
+  size 0.01 4 0.5
+}
+DEF Boundary_Wall2 Obstacle {
+  translation 2 0 0.25
+  name "Obstacle(6)"
+  size 0.01 4 0.5
+}
+DEF Boundary_Wall3 Obstacle {
+  translation -2 0 0.25
+  name "Obstacle(7)"
+  size 0.01 4 0.5
+}
+DEF Obstacle_0 Obstacle {
+  translation 1 -0.5 0.25
+  rotation 0 0 1 3.14
+  name "Obstacle(8)"
+  size 0.01 3 0.5
+}
+DEF Obstacle_1 Obstacle {
+  translation 0 1 0.25
+  rotation 0 0 1 -1.57
+  name "Obstacle(9)"
+  size 0.01 2 0.5
+}
+DEF Obstacle_2 Obstacle {
+  translation -1 0 0.25
+  rotation 0 0 1 -1.57
+  name "Obstacle(10)"
+  size 0.01 2 0.5
+}
+DEF Obstacle_3 Obstacle {
+  translation 0 -1 0.25
+  rotation 0 0 1 -1.57
+  name "Obstacle(11)"
+  size 0.01 2 0.5
+}
+DEF Boundary_Wall0 Obstacle {
+  translation 0 -2 0.25
+  rotation 0 0 1 -1.57
+  name "Obstacle(12)"
+  size 0.01 4 0.5
+}
+DEF Boundary_Wall1 Obstacle {
+  translation 0 2 0.25
+  rotation 0 0 1 -1.57
+  name "Obstacle(13)"
+  size 0.01 4 0.5
+}
+DEF Boundary_Wall2 Obstacle {
+  translation 2 0 0.25
+  name "Obstacle(14)"
+  size 0.01 4 0.5
+}
+DEF Boundary_Wall3 Obstacle {
+  translation -2 0 0.25
+  name "Obstacle(15)"
+  size 0.01 4 0.5
 }
