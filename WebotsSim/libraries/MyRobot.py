@@ -6,13 +6,12 @@ class MyRobot(RosBot):
     def __init__(self):
         RosBot.__init__(self)
 
-    # Speed preference (radians per second, converts to ~)
-    speed_pref = 5
-    rotational_speed_pref = 1
-    # Movement precision preference (in meters)
-    linear_precision_pref = 0.005
-    # Rotational precision preference (in degrees)
-    angular_precision_pref = 1
+    # Preference parameters
+    speed_pref = 5  # radians per second per wheel
+    angular_speed_pref = 2  # radians per second relative to ICC
+    rotational_speed_pref = 1  # radians per second per wheel
+    linear_precision_pref = 0.005  # meters
+    angular_precision_pref = 1  # degrees
 
     # Basal Sensor Readings
     initial_fle = 0
@@ -25,7 +24,7 @@ class MyRobot(RosBot):
 
     # Get relative total distance traveled based on initial encoder readings
     def relative_fle(self):
-        return self.get_front_left_motor_encoder_reading() - self.initial_fre
+        return self.get_front_left_motor_encoder_reading() - self.initial_fle
 
     def relative_fre(self):
         return self.get_front_right_motor_encoder_reading() - self.initial_fre
@@ -37,13 +36,21 @@ class MyRobot(RosBot):
         # range of target distance
         self.set_right_motors_velocity(self.speed_pref)
         self.set_left_motors_velocity(self.speed_pref)
-        while (self.relative_fre() + self.relative_fle() - current_ae) / 2 * self.wheel_radius <= distance - self.linear_precision_pref:
+        while ((self.relative_fre() + self.relative_fle())/2 - current_ae) * self.wheel_radius <= distance - self.linear_precision_pref:
             self.advance()
         self.stop()
 
     # Move in an arc a given distance with a certain radius - clock direction
-    # will be determined by sign of radius
+    # will be determined by sign of radius:
+    # +/- = clockwise/counterclockwise
     def move_arc(self, distance, radius):
+        current_ae = (self.relative_fre() + self.relative_fle()) / 2
+        sign = 1 if radius >= 0 else -1
+        if radius < 0:
+            radius *= -1
+        velocity_outer = self.angular_speed_pref * (radius + (self.axel_length/2))
+        velocity_inner = self.angular_speed_pref * (radius - (self.axel_length/2))
+
         return
 
     # Rotate inplace by a specified angle (in degrees):
@@ -71,6 +78,7 @@ class MyRobot(RosBot):
                 self.set_left_motors_velocity(-self.rotational_speed_pref)
                 self.set_right_motors_velocity(self.rotational_speed_pref)
             self.advance()
+        self.stop()
 
 
 

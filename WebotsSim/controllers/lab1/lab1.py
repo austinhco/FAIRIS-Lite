@@ -24,7 +24,8 @@ robot.initial_fre = robot.get_front_right_motor_encoder_reading()
 
 # Set calculation parameters
 robot.speed_pref = 5
+robot.angular_speed_pref = 2
 robot.rotational_speed_pref = 1
 
 # Movement Script
-robot.rotate(+270)
+
