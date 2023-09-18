@@ -33,8 +33,10 @@ robot.braking_velocity = 5
 robot.angular_braking_velocity = 2.5
 
 # Set pose estimate
-robot.estimated_x = 1.5
-robot.estimated_y = -1.5
+robot.estimated_x = 1500
+robot.estimated_y = -1500
+robot.last_fle = robot.initial_fle
+robot.last_fre = robot.initial_fre
 
 # Movement Script
 robot.move_linear(2.5)

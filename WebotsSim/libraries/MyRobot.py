@@ -1,4 +1,6 @@
 import math
+import statistics
+import sys
 
 from WebotsSim.libraries.RobotLib.RosBot import RosBot
 
@@ -22,10 +24,58 @@ class MyRobot(RosBot):
     initial_fle = 0
     initial_fre = 0
 
+    # Position estimates
+    estimated_x = 0
+    estimated_y = 0
+
+    # Last encoder readings
+    last_fle = 0
+    last_fre = 0
+
+    # Update position estimate
+    def update_estimates(self):
+        heading = self.get_compass_reading() * (math.pi / 180)
+        distance = self.calculate_distance(statistics.mean([self.last_fle, self.last_fre]))
+        self.estimated_x -= distance * math.cos(heading)
+        self.estimated_y -= distance * math.sin(heading)
+        self.last_fre = self.get_front_right_motor_encoder_reading()
+        self.last_fle = self.get_front_left_motor_encoder_reading()
+        return
+
+    # Calculate distance travelled since input encoder start point
+    def calculate_distance(self, initial_average_encoder_reading):
+        return (statistics.mean([self.relative_fre(), self.relative_fle()]) - initial_average_encoder_reading) * self.wheel_radius
+
+    # Move until a set distance has been travelled. If arc is set, brake as such using movement sign
+    def move_until(self, initial_average_encoder_reading, distance, arc=False, sign=0, velocity_outer=0, velocity_inner=0):
+        while self.calculate_distance(initial_average_encoder_reading) <= distance - self.linear_precision_pref:
+            if arc:
+                brake_mult = self.angular_braking_velocity / statistics.mean([velocity_outer, velocity_inner])
+                if sign:
+                    self.set_left_motors_velocity(velocity_outer * brake_mult)
+                    self.set_right_motors_velocity(velocity_inner * brake_mult)
+                else:
+                    self.set_right_motors_velocity(velocity_outer * brake_mult)
+                    self.set_left_motors_velocity(velocity_inner * brake_mult)
+            else:
+                if self.calculate_distance(initial_average_encoder_reading) >= distance - self.linear_precision_pref - self.braking_distance:
+                    self.set_right_motors_velocity(self.braking_velocity)
+                    self.set_left_motors_velocity(self.braking_velocity)
+            self.advance()
+
+    def print_pose(self):
+        pose_str =  "Heading: " + str(self.get_compass_reading())
+        pose_str += " || X: " + str(round(self.estimated_x/1000, 2))
+        pose_str += " || Y: " + str(round(self.estimated_y/1000, 2))
+        sys.stdout.write("\r" + pose_str)
+        sys.stdout.flush()
+
     # Advance time (unless stop signal)
     def advance(self):
         if self.step(int(self.getBasicTimeStep())) == -1:
             exit(0)
+        self.update_estimates()
+        self.print_pose()
 
     # Get relative total distance traveled based on initial encoder readings
     def relative_fle(self):
@@ -41,11 +91,7 @@ class MyRobot(RosBot):
         # range of target distance
         self.set_right_motors_velocity(self.speed_pref)
         self.set_left_motors_velocity(self.speed_pref)
-        while ((self.relative_fre() + self.relative_fle())/2 - current_ae) * self.wheel_radius <= distance - self.linear_precision_pref:
-            if ((self.relative_fre() + self.relative_fle())/2 - current_ae) * self.wheel_radius >= distance - self.linear_precision_pref - self.braking_distance:
-                self.set_right_motors_velocity(self.braking_velocity)
-                self.set_left_motors_velocity(self.braking_velocity)
-            self.advance()
+        self.move_until(current_ae, distance)
         self.stop()
 
     # Move in an arc a given distance (m) with a certain radius (m) - clock direction
@@ -60,8 +106,7 @@ class MyRobot(RosBot):
         velocity_outer = radius + (self.axel_length/2)
         velocity_inner = radius - (self.axel_length/2)
         # Normalize velocity to angular speed pref and adjust inner and outer accordingly
-        mult = self.angular_speed_pref / ((velocity_outer + velocity_inner)/2)
-        brake_mult = self.angular_braking_velocity / ((velocity_outer + velocity_inner)/2)
+        mult = self.angular_speed_pref / statistics.mean([velocity_outer, velocity_inner])
         if sign:
             self.set_left_motors_velocity(velocity_outer * mult)
             self.set_right_motors_velocity(velocity_inner * mult)
@@ -69,15 +114,7 @@ class MyRobot(RosBot):
             self.set_right_motors_velocity(velocity_outer * mult)
             self.set_left_motors_velocity(velocity_inner * mult)
         # Move until distance quota met
-        while ((self.relative_fre() + self.relative_fle())/2 - current_ae) * self.wheel_radius <= distance - self.linear_precision_pref:
-            if ((self.relative_fre() + self.relative_fle())/2 - current_ae) * self.wheel_radius >= distance - self.linear_precision_pref - self.braking_distance:
-                if sign:
-                    self.set_left_motors_velocity(velocity_outer * brake_mult)
-                    self.set_right_motors_velocity(velocity_inner * brake_mult)
-                else:
-                    self.set_right_motors_velocity(velocity_outer * brake_mult)
-                    self.set_left_motors_velocity(velocity_inner * brake_mult)
-            self.advance()
+        self.move_until(current_ae, distance, True, sign, velocity_outer, velocity_inner)
         self.stop()
 
 # Traverse an arc, calculating the distance to be traveled based on the angle (deg) and radius (m) passed
