@@ -10,6 +10,9 @@ class MyRobot(RosBot):
     def __init__(self):
         RosBot.__init__(self)
 
+    # Print velocities and times before moving
+    noisy = False
+
     # Preference parameters
     speed_pref = 5  # radians per second per wheel
     angular_speed_pref = 2  # radians per second relative to ICC
@@ -46,6 +49,14 @@ class MyRobot(RosBot):
     def calculate_distance(self, initial_average_encoder_reading):
         return (statistics.mean([self.relative_fre(), self.relative_fle()]) - initial_average_encoder_reading) * self.wheel_radius
 
+    def print_decision(self, distance, velocity_l, velocity_r):
+        speed = statistics.mean([velocity_l, velocity_r])
+        print("     Speed: " + str(round(speed*self.wheel_radius, 2)) + "m/s")
+        print("L Velocity: " + str(round(velocity_l*self.wheel_radius, 2)) + "m/s")
+        print("R Velocity: " + str(round(velocity_r*self.wheel_radius, 2)) + "m/s")
+        print("       ETA: " + str(round((distance / (speed * self.wheel_radius)) + (
+                    self.braking_distance / (self.braking_velocity * self.wheel_radius)), 2)) + "s")
+
     # Move until a set distance has been travelled. If arc is set, brake as such using movement sign
     def move_until(self, initial_average_encoder_reading, distance, arc=False, sign=0, velocity_outer=0, velocity_inner=0):
         while self.calculate_distance(initial_average_encoder_reading) <= distance - self.linear_precision_pref:
@@ -64,18 +75,19 @@ class MyRobot(RosBot):
             self.advance()
 
     def print_pose(self):
-        pose_str =  "Heading: " + str(self.get_compass_reading())
-        pose_str += " || X: " + str(round(self.estimated_x, 2))
-        pose_str += " || Y: " + str(round(self.estimated_y, 2))
+        pose_str =  "Heading: " + str(self.get_compass_reading()) + "°"
+        pose_str += " || X: " + str(round(self.estimated_x, 2)) + "m"
+        pose_str += " || Y: " + str(round(self.estimated_y, 2)) + "m"
         sys.stdout.write("\r" + pose_str)
         sys.stdout.flush()
 
     # Advance time (unless stop signal)
-    def advance(self):
+    def advance(self, quiet=False):
         if self.step(int(self.getBasicTimeStep())) == -1:
             exit(0)
         self.update_estimates()
-        self.print_pose()
+        if not quiet:
+            self.print_pose()
 
     # Get relative total distance traveled based on initial encoder readings
     def relative_fle(self):
@@ -87,6 +99,9 @@ class MyRobot(RosBot):
     # Move forward a given distance (in m), calculated via sensor readings, NOT TIME
     def move_linear(self, distance):
         current_ae = (self.relative_fre() + self.relative_fle()) / 2
+        if self.noisy:
+            # Print wheel velocities and time estimate
+            self.print_decision(distance, self.speed_pref, self.speed_pref)
         # Move forward until average encoder reading is within acceptable
         # range of target distance
         self.set_right_motors_velocity(self.speed_pref)
@@ -108,9 +123,13 @@ class MyRobot(RosBot):
         # Normalize velocity to angular speed pref and adjust inner and outer accordingly
         mult = self.angular_speed_pref / statistics.mean([velocity_outer, velocity_inner])
         if sign:
+            if self.noisy:
+                self.print_decision(distance, velocity_outer*mult, velocity_inner*mult)
             self.set_left_motors_velocity(velocity_outer * mult)
             self.set_right_motors_velocity(velocity_inner * mult)
         else:
+            if self.noisy:
+                self.print_decision(distance, velocity_inner*mult, velocity_outer*mult)
             self.set_right_motors_velocity(velocity_outer * mult)
             self.set_left_motors_velocity(velocity_inner * mult)
         # Move until distance quota met
@@ -147,7 +166,7 @@ class MyRobot(RosBot):
             elif angle < 0:
                 self.set_left_motors_velocity(-self.rotational_speed_pref)
                 self.set_right_motors_velocity(self.rotational_speed_pref)
-            self.advance()
+            self.advance(True)
         self.stop()
 
 

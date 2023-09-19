@@ -40,6 +40,9 @@ robot.estimated_y = -1.5
 waypoints = [[1.5, -1.5], [1.5, 1], [1, 1.5], [-1, 1.5], [-1.5, 1], [-1.5, 0.5], [0, 0.5], [0.5, 0], [0, -0.5],
              [-1, -0.5], [-1.5, -1], [-1, -1.5], [0.5, -1.5]]
 
+# Speak up!
+robot.noisy = True
+
 for point in waypoints:
     print("\n")
     # Calculate distance and angle between current position and next waypoint
@@ -56,10 +59,10 @@ for point in waypoints:
         angle_dif -= 360
     while angle_dif < -180:
         angle_dif += 360
-    print("X Distance: " + str(round(distance_x, 2)))
-    print("Y Distance: " + str(round(distance_y, 2)))
-    print("  Distance: " + str(round(distance, 2)))
-    print("     Angle: " + str(round(angle, 2)))
+    print("X Distance: " + str(round(distance_x, 2)) + "m")
+    print("Y Distance: " + str(round(distance_y, 2)) + "m")
+    print("  Distance: " + str(round(distance, 2)) + "m")
+    print("     Angle: " + str(round(angle)) + "°")
     # Attempt to rectify angle if performing a linear motion, then move
     if not (move_x and move_y):
         robot.rotate(-angle_dif)
@@ -67,6 +70,8 @@ for point in waypoints:
     else:
         # Movement is arching: additional calculations required
         radius = math.sqrt(math.pow(distance, 2)/2)
+        # If possible, rotate to intended angle between last two waypoints
+
         # If destination is relative right, clockwise. If left, counter.
         if angle_dif > 0:
             robot.move_arc_angle(angle_dif*2, -radius)
