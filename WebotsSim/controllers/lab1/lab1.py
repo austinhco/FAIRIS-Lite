@@ -46,33 +46,29 @@ for point in waypoints:
     distance_x = point[0] - robot.estimated_x
     distance_y = point[1] - robot.estimated_y
     distance = math.sqrt(math.pow(distance_x, 2) + math.pow(distance_y, 2))
-    move_x = False if distance_x <= robot.linear_precision_pref else True
-    move_y = False if distance_y <= robot.linear_precision_pref else True
+    if not distance:
+        continue
+    move_x = False if math.fabs(distance_x) <= robot.linear_precision_pref*10 else True
+    move_y = False if math.fabs(distance_y) <= robot.linear_precision_pref*10 else True
     angle = math.atan2(distance_y, distance_x) * (180 / math.pi)
+    angle_dif = angle - robot.get_compass_reading()
+    while angle_dif > 180:
+        angle_dif -= 360
+    while angle_dif < -180:
+        angle_dif += 360
     print("X Distance: " + str(round(distance_x, 2)))
     print("Y Distance: " + str(round(distance_y, 2)))
     print("  Distance: " + str(round(distance, 2)))
     print("     Angle: " + str(round(angle, 2)))
     # Attempt to rectify angle if performing a linear motion, then move
-    print(move_x, move_y)
     if not (move_x and move_y):
-        robot.rotate(angle - robot.get_compass_reading())
-        if move_x:
-            robot.move_linear(distance_x)
-        elif move_y:
-            robot.move_linear(distance_y)
+        robot.rotate(-angle_dif)
+        robot.move_linear(distance)
     else:
         # Movement is arching: additional calculations required
-        print("Arching movement - skipping")
-
-# robot.move_linear(2.5)
-# robot.move_arc_angle(90, -0.5)
-# robot.move_linear(2)
-# robot.move_arc_angle(90, -0.5)
-# robot.move_linear(0.5)
-# robot.rotate(-90)
-# robot.move_linear(1.5)
-# robot.move_arc_angle(180, 0.5)
-# robot.move_linear(1)
-# robot.move_arc_angle(180, -0.5)
-# robot.move_linear(1.5)
+        radius = math.sqrt(math.pow(distance, 2)/2)
+        # If destination is relative right, clockwise. If left, counter.
+        if angle_dif > 0:
+            robot.move_arc_angle(angle_dif*2, -radius)
+        elif angle_dif < 0:
+            robot.move_arc_angle(angle_dif*2, radius)
