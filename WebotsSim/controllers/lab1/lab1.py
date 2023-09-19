@@ -41,15 +41,29 @@ waypoints = [[1.5, -1.5], [1.5, 1], [1, 1.5], [-1, 1.5], [-1.5, 1], [-1.5, 0.5],
              [-1, -0.5], [-1.5, -1], [-1, -1.5], [0.5, -1.5]]
 
 for point in waypoints:
+    print("\n")
     # Calculate distance and angle between current position and next waypoint
     distance_x = point[0] - robot.estimated_x
     distance_y = point[1] - robot.estimated_y
-    move_x = 0 if distance_x <= robot.linear_precision_pref else 1
-    move_y = 0 if distance_y <= robot.linear_precision_pref else 1
+    distance = math.sqrt(math.pow(distance_x, 2) + math.pow(distance_y, 2))
+    move_x = False if distance_x <= robot.linear_precision_pref else True
+    move_y = False if distance_y <= robot.linear_precision_pref else True
     angle = math.atan2(distance_y, distance_x) * (180 / math.pi)
-    print("\n" + str(distance_x) + " " + str(distance_y) + " " + str(angle))
-    robot.move_linear(2.5)
-    continue
+    print("X Distance: " + str(round(distance_x, 2)))
+    print("Y Distance: " + str(round(distance_y, 2)))
+    print("  Distance: " + str(round(distance, 2)))
+    print("     Angle: " + str(round(angle, 2)))
+    # Attempt to rectify angle if performing a linear motion, then move
+    print(move_x, move_y)
+    if not (move_x and move_y):
+        robot.rotate(angle - robot.get_compass_reading())
+        if move_x:
+            robot.move_linear(distance_x)
+        elif move_y:
+            robot.move_linear(distance_y)
+    else:
+        # Movement is arching: additional calculations required
+        print("Arching movement - skipping")
 
 # robot.move_linear(2.5)
 # robot.move_arc_angle(90, -0.5)
