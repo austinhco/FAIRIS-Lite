@@ -70,8 +70,6 @@ for point in waypoints:
     else:
         # Movement is arching: additional calculations required
         radius = math.sqrt(math.pow(distance, 2)/2)
-        # If possible, rotate to intended angle between last two waypoints
-
         # If destination is relative right, clockwise. If left, counter.
         if angle_dif > 0:
             robot.move_arc_angle(angle_dif*2, -radius)
