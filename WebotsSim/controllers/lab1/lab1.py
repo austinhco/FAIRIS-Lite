@@ -33,20 +33,32 @@ robot.braking_velocity = 5
 robot.angular_braking_velocity = 2.5
 
 # Set pose estimate
-robot.estimated_x = 1500
-robot.estimated_y = -1500
-robot.last_fle = robot.initial_fle
-robot.last_fre = robot.initial_fre
+robot.estimated_x = 1.5
+robot.estimated_y = -1.5
 
 # Movement Script
-robot.move_linear(2.5)
-robot.move_arc_angle(90, -0.5)
-robot.move_linear(2)
-robot.move_arc_angle(90, -0.5)
-robot.move_linear(0.5)
-robot.rotate(-90)
-robot.move_linear(1.5)
-robot.move_arc_angle(180, 0.5)
-robot.move_linear(1)
-robot.move_arc_angle(180, -0.5)
-robot.move_linear(1.5)
+waypoints = [[1.5, -1.5], [1.5, 1], [1, 1.5], [-1, 1.5], [-1.5, 1], [-1.5, 0.5], [0, 0.5], [0.5, 0], [0, -0.5],
+             [-1, -0.5], [-1.5, -1], [-1, -1.5], [0.5, -1.5]]
+
+for point in waypoints:
+    # Calculate distance and angle between current position and next waypoint
+    distance_x = point[0] - robot.estimated_x
+    distance_y = point[1] - robot.estimated_y
+    move_x = 0 if distance_x <= robot.linear_precision_pref else 1
+    move_y = 0 if distance_y <= robot.linear_precision_pref else 1
+    angle = math.atan2(distance_y, distance_x) * (180 / math.pi)
+    print("\n" + str(distance_x) + " " + str(distance_y) + " " + str(angle))
+    robot.move_linear(2.5)
+    continue
+
+# robot.move_linear(2.5)
+# robot.move_arc_angle(90, -0.5)
+# robot.move_linear(2)
+# robot.move_arc_angle(90, -0.5)
+# robot.move_linear(0.5)
+# robot.rotate(-90)
+# robot.move_linear(1.5)
+# robot.move_arc_angle(180, 0.5)
+# robot.move_linear(1)
+# robot.move_arc_angle(180, -0.5)
+# robot.move_linear(1.5)

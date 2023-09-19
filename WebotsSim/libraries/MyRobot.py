@@ -36,10 +36,10 @@ class MyRobot(RosBot):
     def update_estimates(self):
         heading = self.get_compass_reading() * (math.pi / 180)
         distance = self.calculate_distance(statistics.mean([self.last_fle, self.last_fre]))
-        self.estimated_x -= distance * math.cos(heading)
-        self.estimated_y -= distance * math.sin(heading)
-        self.last_fre = self.get_front_right_motor_encoder_reading()
-        self.last_fle = self.get_front_left_motor_encoder_reading()
+        self.estimated_x += distance * math.cos(heading)
+        self.estimated_y += distance * math.sin(heading)
+        self.last_fre = self.relative_fre()
+        self.last_fle = self.relative_fle()
         return
 
     # Calculate distance travelled since input encoder start point
@@ -65,8 +65,8 @@ class MyRobot(RosBot):
 
     def print_pose(self):
         pose_str =  "Heading: " + str(self.get_compass_reading())
-        pose_str += " || X: " + str(round(self.estimated_x/1000, 2))
-        pose_str += " || Y: " + str(round(self.estimated_y/1000, 2))
+        pose_str += " || X: " + str(round(self.estimated_x, 2))
+        pose_str += " || Y: " + str(round(self.estimated_y, 2))
         sys.stdout.write("\r" + pose_str)
         sys.stdout.flush()
 
