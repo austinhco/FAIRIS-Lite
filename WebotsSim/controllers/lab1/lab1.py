@@ -23,14 +23,14 @@ robot.initial_fle = robot.get_front_left_motor_encoder_reading()
 robot.initial_fre = robot.get_front_right_motor_encoder_reading()
 
 # Set calculation parameters
-robot.speed_pref = 10
-robot.angular_speed_pref = 5
-robot.rotational_speed_pref = 1
+robot.speed_pref = 20
+robot.angular_speed_pref = 20
+robot.rotational_speed_pref = 2
 robot.linear_precision_pref = 0.005
 robot.angular_precision_pref = 1
 robot.braking_distance = 0.1
-robot.braking_velocity = 5
-robot.angular_braking_velocity = 2.5
+robot.braking_velocity = 10
+robot.angular_braking_velocity = 10
 
 # Set pose estimate
 robot.estimated_x = 1.5
@@ -51,8 +51,8 @@ for point in waypoints:
     distance = math.sqrt(math.pow(distance_x, 2) + math.pow(distance_y, 2))
     if not distance:
         continue
-    move_x = False if math.fabs(distance_x) <= robot.linear_precision_pref*10 else True
-    move_y = False if math.fabs(distance_y) <= robot.linear_precision_pref*10 else True
+    move_x = False if math.fabs(distance_x) <= robot.linear_precision_pref*2*robot.speed_pref else True
+    move_y = False if math.fabs(distance_y) <= robot.linear_precision_pref*2*robot.speed_pref else True
     angle = math.atan2(distance_y, distance_x) * (180 / math.pi)
     angle_dif = angle - robot.get_compass_reading()
     while angle_dif > 180:
