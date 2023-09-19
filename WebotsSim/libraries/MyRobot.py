@@ -21,7 +21,8 @@ class MyRobot(RosBot):
     angular_precision_pref = 1  # degrees
     braking_distance = 0.25  # meters
     braking_velocity = 1  # radians per second per wheel
-    angular_braking_velocity = 1
+    angular_braking_velocity = 1  # radians per second per wheel
+    arc_threshold = 0.2  # meters
 
     # Basal Sensor Readings
     initial_fle = 0
@@ -114,7 +115,7 @@ class MyRobot(RosBot):
     # +/- = clockwise/counterclockwise
     def move_arc_distance(self, distance, radius):
         # Hack away a silly little precision error
-        distance += (math.pi / 180)
+        # distance += (math.pi / 180)
         current_ae = (self.relative_fre() + self.relative_fle()) / 2
         sign = 1 if radius >= 0 else 0
         radius = math.fabs(radius)

@@ -51,8 +51,8 @@ for point in waypoints:
     distance = math.sqrt(math.pow(distance_x, 2) + math.pow(distance_y, 2))
     if not distance:
         continue
-    move_x = False if math.fabs(distance_x) <= robot.linear_precision_pref*2*robot.speed_pref else True
-    move_y = False if math.fabs(distance_y) <= robot.linear_precision_pref*2*robot.speed_pref else True
+    move_x = False if math.fabs(distance_x) <= robot.linear_precision_pref*40 else True
+    move_y = False if math.fabs(distance_y) <= robot.linear_precision_pref*40 else True
     angle = math.atan2(distance_y, distance_x) * (180 / math.pi)
     angle_dif = angle - robot.get_compass_reading()
     while angle_dif > 180:
