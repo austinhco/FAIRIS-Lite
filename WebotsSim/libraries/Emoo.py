@@ -1,3 +1,5 @@
+# WebotsSim/libraries/Emoo.py
+
 import math
 import statistics
 import sys
@@ -22,7 +24,6 @@ class MyRobot(RosBot):
     braking_distance = 0.25  # meters
     braking_velocity = 1  # radians per second per wheel
     angular_braking_velocity = 1  # radians per second per wheel
-    arc_threshold = 0.2  # meters
 
     # Basal Sensor Readings
     initial_fle = 0

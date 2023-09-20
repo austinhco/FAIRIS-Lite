@@ -1,9 +1,10 @@
-"""lab1 controller."""
+# WebotsSim/controllers/lab1/Lab1_Task1.py
+
 import math
 
 # You may need to import some classes of the controller module. Ex:
 #  from controller import Robot, Motor, DistanceSensor
-from WebotsSim.libraries.MyRobot import MyRobot
+from WebotsSim.libraries.Emoo import MyRobot
 # Set working directory for maze loading
 import os
 

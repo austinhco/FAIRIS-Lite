@@ -199,10 +199,11 @@ Here is a basic usage example:
 ```python
 # Changes Working Directory to be at the root of FAIRIS-Lite
 import os
+
 os.chdir("../..")
 
 # Import MyRobot Class
-from WebotsSim.libraries.MyRobot import MyRobot
+from WebotsSim.libraries.Emoo import MyRobot
 
 # Create the robot instance.
 robot = MyRobot()
@@ -241,7 +242,7 @@ while robot.experiment_supervisor.step(robot.timestep) != -1:
     robot.set_front_right_motor_velocity(20)
 
     # Calculates distance the wheel has turned since beginning of simulation
-    distance_front_left_wheel_traveled = robot.wheel_radius * robot.get_front_left_motor_encoder_reading() 
+    distance_front_left_wheel_traveled = robot.wheel_radius * robot.get_front_left_motor_encoder_reading()
 
     # Stops the robot after the robot moves a distance of 1.5 meters
     if distance_front_left_wheel_traveled > 1.5:
@@ -256,7 +257,7 @@ This documentation provides an overview of the `RosBot` class and its methods, a
 # Extending the RosBot Class
 Within FAIRIS-Lite, an additional Python class named MyRobot is available. This class is designed to build upon the 
 functionalities of the RosBot class, offering further customization for your specific use cases. You can find the 
-source code for this class in the file [FAIRIS-LITE/WebotsSim/libraries/MyRobot.py](MyRobot.py).
+source code for this class in the file [FAIRIS-LITE/WebotsSim/libraries/MyRobot.py](Emoo.py).
 
 For smoother development, we recommend that you augment this class with your custom functions. Since MyRobot is 
 derived from the RosBot class, all the functions detailed above will be at your disposal in this extended class. 

@@ -3,7 +3,7 @@ import os
 os.chdir("../..")
 
 # Import MyRobot Class
-from WebotsSim.libraries.MyRobot import MyRobot
+from WebotsSim.libraries.Emoo import MyRobot
 
 # Create the robot instance.
 robot = MyRobot()
