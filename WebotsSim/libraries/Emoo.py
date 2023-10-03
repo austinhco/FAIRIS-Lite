@@ -15,15 +15,23 @@ class MyRobot(RosBot):
     # Print velocities and times before moving
     noisy = False
 
-    # Preference parameters
+    # Behavioral Preference Parameters
     speed_pref = 5  # radians per second per wheel
     angular_speed_pref = 2  # radians per second relative to ICC
     rotational_speed_pref = 1  # radians per second per wheel
     linear_precision_pref = 0.001  # meters
     angular_precision_pref = 1  # degrees
+    wall_error_precision_pref = 0.1 # meters
     braking_distance = 0.25  # meters
     braking_velocity = 1  # radians per second per wheel
     angular_braking_velocity = 1  # radians per second per wheel
+    wall_avoidance_aggression = 1.2  # distance (m) where turning slows (less aggressive with larger values)
+
+    # Sensor Preference Parameters
+    range_width = 30  # Width of lidar readings in degrees (averages values)
+
+    # PID Preference Parameters
+    pid_k = 1
 
     # Basal Sensor Readings
     initial_fle = 0
@@ -77,9 +85,12 @@ class MyRobot(RosBot):
             self.advance()
 
     def print_pose(self):
-        pose_str =  "Heading: " + str(self.get_compass_reading()) + "°"
-        pose_str += " || X: " + str(round(self.estimated_x, 2)) + "m"
-        pose_str += " || Y: " + str(round(self.estimated_y, 2)) + "m"
+        pose_str =  f"Heading:  {self.get_compass_reading()}°"
+        pose_str += f" || X: {self.estimated_x:.2f}m"
+        pose_str += f" || Y: {self.estimated_y:.2f}m"
+        pose_str += f" || F: {self.detect_distance(180):.2f}"
+        pose_str += f" || R: {self.detect_distance(90):.2f}"
+        pose_str += f" || L: {self.detect_distance(-90):.2f}"
         sys.stdout.write("\r" + pose_str)
         sys.stdout.flush()
 
@@ -171,5 +182,86 @@ class MyRobot(RosBot):
             self.advance(True)
         self.stop()
 
+    # PID-based functions start here
 
+    # Convert angle from backward in degrees to lidar index
+    # Since python can handle negative indices, no need to account for negative angles
+    def angle_to_lidar(self, angle):
+        return round((angle/360) * 800)
 
+    # Cap input PID error value to within braking distance preference
+    def cap_error(self, error, max):
+        error = error / max
+        if error > 1:
+            error = 1
+        if error < -1:
+            error = -1
+        return error
+
+    # Detect distance between robot and nearest object in specified direction (deg)
+    def detect_distance(self, angle):
+        ranges = self.lidar.getRangeImage()
+        considered = []
+        index_back = self.angle_to_lidar(angle-(self.range_width/2))
+        index_forward = self.angle_to_lidar(angle+(self.range_width/2))
+        for i in range(index_back, index_forward):
+            considered.append(ranges[i])
+        return statistics.mean(considered)
+
+    # Move forward until reaching the input distance from an object
+    # Will implement PID control to maximize speed and stop smoothly
+    def move_within(self, distance):
+        error = (self.detect_distance(180) - distance) * self.pid_k
+        if math.fabs(error) <= self.linear_precision_pref:
+            self.stop()
+            return
+        # Cap error to only slow down within braking distance
+        error = self.cap_error(error, self.braking_distance)
+        self.set_left_motors_velocity(error*self.max_motor_velocity)
+        self.set_right_motors_velocity(error*self.max_motor_velocity)
+
+    # Move forward until reaching input distance from an object
+    # Also avoid side walls by input distance
+    def move_through(self, distance, wall_distance):
+        error = (self.detect_distance(180) - distance) * self.pid_k
+        error_left = (self.detect_distance(90) - wall_distance) * self.pid_k
+        error_right = (self.detect_distance(-90) - wall_distance) * self.pid_k
+        # Stop if within range of final destination
+        if math.fabs(error) <= self.linear_precision_pref:
+            self.stop()
+            return
+        # Cap error within braking distance
+        error = self.cap_error(error, self.braking_distance)
+        if error_left >= wall_distance and error_right >= wall_distance:
+            # If we are far enough from both walls, simply move forward
+            self.set_left_motors_velocity(error * self.max_motor_velocity)
+            self.set_right_motors_velocity(error * self.max_motor_velocity)
+            return
+        elif math.fabs(error_left) > math.fabs(error_right):
+            # Move away/toward the left wall
+            if error_left > 0:
+                # Move left
+                self.set_right_motors_velocity(error*self.max_motor_velocity)
+                error_left = self.cap_error(error_left, self.wall_avoidance_aggression)
+                self.set_left_motors_velocity(error*self.max_motor_velocity * (1 - error_left))
+                return
+            else:
+                # Move right
+                self.set_left_motors_velocity(error*self.max_motor_velocity)
+                error_left = self.cap_error(error_left, self.wall_avoidance_aggression)
+                self.set_right_motors_velocity(error*self.max_motor_velocity * (1 - error_left))
+                return
+        else:
+            # Move away/toward the right wall
+            if error_right > 0:
+                # Move right
+                self.set_left_motors_velocity(error*self.max_motor_velocity)
+                error_right = self.cap_error(error_right, self.wall_avoidance_aggression)
+                self.set_right_motors_velocity(error*self.max_motor_velocity * (1 - error_right))
+                return
+            else:
+                # Move left
+                self.set_right_motors_velocity(error*self.max_motor_velocity)
+                error_right = self.cap_error(error_right, self.wall_avoidance_aggression)
+                self.set_left_motors_velocity(error*self.max_motor_velocity * (1 - error_right))
+                return
