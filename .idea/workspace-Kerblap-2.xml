@@ -1,0 +1,113 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="AutoImportSettings">
+    <option name="autoReloadType" value="SELECTIVE" />
+  </component>
+  <component name="ChangeListManager">
+    <list default="true" id="319e76a0-a7ba-44fe-b29e-fd6a4aa70abd" name="Changes" comment="">
+      <change beforePath="$PROJECT_DIR$/.idea/FAIRIS-Lite.iml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/FAIRIS-Lite.iml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/misc.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/misc.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/vcs.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/vcs.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/WebotsSim/libraries/MyRobot.py" beforeDir="false" afterPath="$PROJECT_DIR$/WebotsSim/libraries/MyRobot.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/WebotsSim/worlds/.StartingWorld.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/WebotsSim/worlds/.StartingWorld.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/WebotsSim/worlds/.StartingWorld.wbproj" beforeDir="false" afterPath="$PROJECT_DIR$/WebotsSim/worlds/.StartingWorld.wbproj" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/WebotsSim/worlds/StartingWorld.wbt" beforeDir="false" afterPath="$PROJECT_DIR$/WebotsSim/worlds/StartingWorld.wbt" afterDir="false" />
+    </list>
+    <option name="SHOW_DIALOG" value="false" />
+    <option name="HIGHLIGHT_CONFLICTS" value="true" />
+    <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
+    <option name="LAST_RESOLUTION" value="IGNORE" />
+  </component>
+  <component name="FileTemplateManagerImpl">
+    <option name="RECENT_TEMPLATES">
+      <list>
+        <option value="Python Script" />
+      </list>
+    </option>
+  </component>
+  <component name="Git.Settings">
+    <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
+  </component>
+  <component name="GitHubPullRequestSearchHistory">{
+  &quot;lastFilter&quot;: {
+    &quot;state&quot;: &quot;OPEN&quot;
+  }
+}</component>
+  <component name="GithubPullRequestsUISettings">
+    <option name="selectedUrlAndAccountId">
+      <UrlAndAccount>
+        <option name="accountId" value="a1604d75-e777-4cc0-ab2c-186773747916" />
+        <option name="url" value="https://github.com/biorobaw/FAIRIS-Lite.git" />
+      </UrlAndAccount>
+    </option>
+  </component>
+  <component name="MarkdownSettingsMigration">
+    <option name="stateVersion" value="1" />
+  </component>
+  <component name="ProjectColorInfo">{
+  &quot;associatedIndex&quot;: 3
+}</component>
+  <component name="ProjectId" id="2UlRdOSOyCILabkFiKRhVjTVhof" />
+  <component name="ProjectViewState">
+    <option name="hideEmptyMiddlePackages" value="true" />
+    <option name="showLibraryContents" value="true" />
+  </component>
+  <component name="PropertiesComponent">{
+  &quot;keyToString&quot;: {
+    &quot;RunOnceActivity.OpenProjectViewOnStart&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
+    &quot;WebServerToolWindowFactoryState&quot;: &quot;false&quot;,
+    &quot;git-widget-placeholder&quot;: &quot;main&quot;,
+    &quot;last_opened_file_path&quot;: &quot;C:/Users/seven/OneDrive/Documents/GitHub/FAIRIS-Lite/WebotsSim/controllers/lab1&quot;,
+    &quot;node.js.detected.package.eslint&quot;: &quot;true&quot;,
+    &quot;node.js.detected.package.tslint&quot;: &quot;true&quot;,
+    &quot;node.js.selected.package.eslint&quot;: &quot;(autodetect)&quot;,
+    &quot;node.js.selected.package.tslint&quot;: &quot;(autodetect)&quot;,
+    &quot;nodejs_package_manager_path&quot;: &quot;npm&quot;,
+    &quot;settings.editor.selected.configurable&quot;: &quot;com.jetbrains.python.configuration.PyActiveSdkModuleConfigurable&quot;,
+    &quot;vue.rearranger.settings.migration&quot;: &quot;true&quot;
+  }
+}</component>
+  <component name="RecentsManager">
+    <key name="CopyFile.RECENT_KEYS">
+      <recent name="C:\Users\seven\OneDrive\Documents\GitHub\FAIRIS-Lite\WebotsSim\controllers\lab1" />
+      <recent name="C:\Users\seven\OneDrive\Documents\GitHub\FAIRIS-Lite\WebotsSim\controllers\practice_controller" />
+    </key>
+  </component>
+  <component name="SpellCheckerSettings" RuntimeDictionaries="0" Folders="0" CustomDictionaries="0" DefaultDictionary="application-level" UseSingleDictionary="true" transferred="true" />
+  <component name="TaskManager">
+    <task active="true" id="Default" summary="Default task">
+      <changelist id="319e76a0-a7ba-44fe-b29e-fd6a4aa70abd" name="Changes" comment="" />
+      <created>1693512267762</created>
+      <option name="number" value="Default" />
+      <option name="presentableId" value="Default" />
+      <updated>1693512267762</updated>
+      <workItem from="1693512268731" duration="1313000" />
+      <workItem from="1693930485190" duration="3000" />
+      <workItem from="1693938544343" duration="2967000" />
+      <workItem from="1694616742297" duration="1689000" />
+      <workItem from="1694701848680" duration="4146000" />
+      <workItem from="1694801095685" duration="617000" />
+    </task>
+    <servers />
+  </component>
+  <component name="TypeScriptGeneratedFilesManager">
+    <option name="version" value="3" />
+  </component>
+  <component name="Vcs.Log.Tabs.Properties">
+    <option name="TAB_STATES">
+      <map>
+        <entry key="MAIN">
+          <value>
+            <State />
+          </value>
+        </entry>
+      </map>
+    </option>
+  </component>
+  <component name="com.intellij.coverage.CoverageDataManagerImpl">
+    <SUITE FILE_PATH="coverage/FAIRIS_Lite$Template.coverage" NAME="Template Coverage Results" MODIFIED="1694720336818" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/WebotsSim/controllers/Template" />
+    <SUITE FILE_PATH="coverage/FAIRIS_Lite$practice_controller.coverage" NAME="practice_controller Coverage Results" MODIFIED="1694701881068" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/WebotsSim/controllers/practice_controller" />
+    <SUITE FILE_PATH="coverage/FAIRIS_Lite$lab1.coverage" NAME="lab1 Coverage Results" MODIFIED="1694801673196" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/WebotsSim/controllers/lab1" />
+  </component>
+</project>

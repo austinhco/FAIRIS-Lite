@@ -7,7 +7,7 @@ import sys
 from WebotsSim.libraries.RobotLib.RosBot import RosBot
 
 
-class MyRobot(RosBot):
+class Emoo(RosBot):
 
     def __init__(self):
         RosBot.__init__(self)
@@ -232,11 +232,10 @@ class MyRobot(RosBot):
             return
         # Cap error within braking distance
         error = self.cap_error(error, self.braking_distance)
-        if error_left >= wall_distance and error_right >= wall_distance:
+        if self.detect_distance(90) >= wall_distance and self.detect_distance(-90) >= wall_distance:
             # If we are far enough from both walls, simply move forward
             self.set_left_motors_velocity(error * self.max_motor_velocity)
             self.set_right_motors_velocity(error * self.max_motor_velocity)
-            return
         elif math.fabs(error_left) > math.fabs(error_right):
             # Move away/toward the left wall
             if error_left > 0:
@@ -244,13 +243,11 @@ class MyRobot(RosBot):
                 self.set_right_motors_velocity(error*self.max_motor_velocity)
                 error_left = self.cap_error(error_left, self.wall_avoidance_aggression)
                 self.set_left_motors_velocity(error*self.max_motor_velocity * (1 - error_left))
-                return
             else:
                 # Move right
                 self.set_left_motors_velocity(error*self.max_motor_velocity)
                 error_left = self.cap_error(error_left, self.wall_avoidance_aggression)
                 self.set_right_motors_velocity(error*self.max_motor_velocity * (1 - error_left))
-                return
         else:
             # Move away/toward the right wall
             if error_right > 0:
@@ -258,10 +255,8 @@ class MyRobot(RosBot):
                 self.set_left_motors_velocity(error*self.max_motor_velocity)
                 error_right = self.cap_error(error_right, self.wall_avoidance_aggression)
                 self.set_right_motors_velocity(error*self.max_motor_velocity * (1 - error_right))
-                return
             else:
                 # Move left
                 self.set_right_motors_velocity(error*self.max_motor_velocity)
                 error_right = self.cap_error(error_right, self.wall_avoidance_aggression)
                 self.set_left_motors_velocity(error*self.max_motor_velocity * (1 - error_right))
-                return
