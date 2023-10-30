@@ -1,4 +1,4 @@
-# WebotsSim/controllers/lab1/Lab1_Task1.py
+# WebotsSim/controllers/lab2/Lab2_Task1.py
 
 import math
 
@@ -27,26 +27,27 @@ emoo.initial_fre = emoo.get_front_right_motor_encoder_reading()
 emoo.speed_pref = 20
 emoo.angular_speed_pref = 20
 emoo.rotational_speed_pref = 2
-emoo.linear_precision_pref = 0.01
-emoo.angular_precision_pref = 1
+emoo.linear_precision_pref = 0.005
+emoo.angular_precision_pref = 3
 emoo.wall_error_precision_pref = 0.05
 emoo.braking_distance = 0.5
 emoo.braking_velocity = 10
 emoo.angular_braking_velocity = 10
-emoo.wall_avoidance_aggression = 1.2
+emoo.wall_following_speed = 10
 
 # Set sensor parameters
-emoo.range_width = 5
+emoo.range_width = 10
 
 # Set PID parameters
-emoo.pid_k = 1  # kp
+emoo.pid_kp = 1  # k forward
+emoo.pid_ks = 4  # k side
 
 # Set pose estimate
 emoo.estimated_x = 0
 emoo.estimated_y = -1.5
 
-emoo.move_arc_angle(10, 0.5)
-emoo.move_linear(0.1)
 while 1:
-    emoo.move_through(0.5, 0.3)
+    # Map can be set above on line 18
+    emoo.move_through(0.5, 0.3)  # Approach far wall while avoiding side walls
+    # emoo.follow_wall("left", 0.3)  # Wall follow
     emoo.advance()
