@@ -15,7 +15,7 @@ emoo = Emoo()
 
 # reset robot position
 # Loads the environment from the maze file
-maze_file = 'worlds/mazes/Labs/Lab2/Lab2_1.xml'
+maze_file = 'worlds/mazes/Labs/Lab2/Lab2_3.xml'
 emoo.load_environment(maze_file)
 emoo.move_to_start()
 
@@ -47,7 +47,5 @@ emoo.estimated_x = 0
 emoo.estimated_y = -1.5
 
 while 1:
-    # Map can be set above on line 18
-    emoo.move_through(0.5, 0.3)  # Approach far wall while avoiding side walls
-    # emoo.follow_wall("left", 0.3)  # Wall follow
+    emoo.follow_wall("left", 0.3)  # Wall follow
     emoo.advance()
