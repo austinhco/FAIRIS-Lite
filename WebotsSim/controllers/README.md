@@ -12,17 +12,17 @@ This guide assumes that you have already preformed the [FAIRIS-Lite Setup](../..
 1. Launch WebotsR2023b and open the world file located in ```FAIRIS-Lite/WebotsSim/worlds/StartingWorld.wbt```
 2. Within the Webots GUI select: ```File -> New -> New Robot Controller...```
 
-3. ![img.png](../../docs/figs/newcontr1.png)
+![img.png](../../docs/figs/newcontr1.png)
 
-4. This will launch a new controller creation wizard select ```Continue```
+3. This will launch a new controller creation wizard select ```Continue```
 
 ![img.png](../../docs/figs/contrwiz.png)
 
-6. You will need to select ```Python``` as the language for your new controller program
+4. You will need to select ```Python``` as the language for your new controller program
 
 ![img.png](../../docs/figs/wizlang.png)
 
-8. Next you will provide a name for the new controller
+5. Next you will provide a name for the new controller
 
 ![img.png](../../docs/figs/contrname.png)
 
@@ -33,8 +33,12 @@ This guide assumes that you have already preformed the [FAIRIS-Lite Setup](../..
 
 ![img.png](../../docs/figs/runtime.png)
 
+<<<<<<< HEAD
 10. We recomend that you include the following lines in your new Python controller.
 
+=======
+8. We recomend that you include the following lines in your new Python controller.
+>>>>>>> upstream
 ```python
 # Changes Working Directory to be at the root of FAIRIS-Lite
 import os
