@@ -1,12 +1,13 @@
+# Import MyRobot Class
+from WebotsSim.libraries.Emoo import Emoo
+
 # Changes Working Directory to be at the root of FAIRIS-Lite
 import os
+
 os.chdir("../..")
 
-# Import MyRobot Class
-from WebotsSim.libraries.MyRobot import MyRobot
-
 # Create the robot instance.
-robot = MyRobot()
+robot = Emoo()
 
 # Loads the environment from the maze file
 maze_file = 'worlds/mazes/Labs/Lab3/Lab3_Task1.xml'
@@ -29,19 +30,13 @@ while robot.experiment_supervisor.step(robot.timestep) != -1:
         # prints Info of detected object
         print('#######################################################################################################')
         print(f'Object ID: {landmark.getId()}')
-        print(f'Object Location relative to the camera: \n X: {landmark.getPosition()[0]} \t Y: {landmark.getPosition()[1]} \t Z: {landmark.getPosition()[2]}')
+        print(
+            f'Object Location relative to the camera: \n X: {landmark.getPosition()[0]} \t Y: {landmark.getPosition()[1]} \t Z: {landmark.getPosition()[2]}')
         print(f'Object relative Size: \n Y: {landmark.getSize()[0]} \t Z: {landmark.getSize()[1]}')
-        print(f'Object position on image: \n X: {landmark.getPositionOnImage()[0]} \t Y: {landmark.getPositionOnImage()[1]}')
+        print(
+            f'Object position on image: \n X: {landmark.getPositionOnImage()[0]} \t Y: {landmark.getPositionOnImage()[1]}')
         print(f'Object size on image: \n X: {landmark.getSizeOnImage()[0]} \t Y: {landmark.getSizeOnImage()[1]}')
-
 
     # Sets the robot's motor velocity to 20 rad/sec
     robot.set_right_motors_velocity(-5)
     robot.set_left_motors_velocity(5)
-
-
-
-
-
-
-
