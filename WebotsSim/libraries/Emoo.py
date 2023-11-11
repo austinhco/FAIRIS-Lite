@@ -12,6 +12,10 @@ class Emoo(RosBot):
     def __init__(self):
         RosBot.__init__(self)
 
+    # Properties
+    camera_resolution = [633, 633]  # X, Y. Y not tested - assumed square
+    camera_fov = [62, 62]  # X, Y. Y not tested - assumed square
+
     # Print velocities and times before moving
     noisy = False
 
@@ -26,6 +30,7 @@ class Emoo(RosBot):
     braking_velocity = 1  # radians per second per wheel
     angular_braking_velocity = 1  # radians per second per wheel
     wall_following_speed = 1  # error cap for wall following. higher values -> less aggression
+    target_angle_width = 10  # range to be considered facing target
 
     # Sensor Preference Parameters
     range_width = 30  # Width of lidar readings in degrees (averages values)
@@ -52,6 +57,9 @@ class Emoo(RosBot):
     # Last encoder readings
     last_fle = 0
     last_fre = 0
+
+    # Camera target information
+    target_size = [0, 0]
 
     # Override stop function to add state update
     def stop(self):
@@ -232,7 +240,7 @@ class Emoo(RosBot):
     # Get asymptotic function result for input value - used to extract multiplier from error value
     def asymptotic_error(self, error, pid):
         error *= pid
-        return error/(math.sqrt(math.pow(error, 2)+1))
+        return error / (math.sqrt(math.pow(error, 2) + 1))
 
     # Get lidar readings within specified range
     def get_lidar_ranges(self, angle, width):
@@ -271,7 +279,7 @@ class Emoo(RosBot):
     def pid_speed(self, error):
         error *= self.pid_kp
         error = self.error_as_ratio(error, self.braking_distance)
-        return error * self.max_motor_velocity
+        return error * self.speed_pref
 
     # Get inner wheel speed for turn based on outer wheel speed and wall error
     def inner_speed(self, outer, error):
@@ -343,8 +351,14 @@ class Emoo(RosBot):
     def left_far(self, distance):
         return self.get_left_wall_distance() > distance * 2.5
 
+    def left_very_far(self, distance):
+        return self.get_left_wall_distance() > distance * 10
+
     def right_far(self, distance):
         return self.get_right_wall_distance() > distance * 2.5
+
+    def right_very_far(self, distance):
+        return self.get_right_wall_distance() > distance * 10
 
     # Use quarter-circle turns to align with wall
     def align_left(self, distance):
@@ -376,12 +390,21 @@ class Emoo(RosBot):
             # If there is a wall within "distance" in front of me, turn 90 toward larger side opening
             if self.get_forward_distance() <= distance + self.linear_precision_pref or self.left_far(distance):
                 if self.get_left_wall_distance() > self.get_right_wall_distance() or self.left_far(distance):
+                    # If left and right walls appear very far, rotate 90deg right and align with forward wall
+                    if self.left_very_far(distance) and self.right_very_far(
+                            distance) and self.get_forward_distance() < distance * 5:
+                        err_for = self.get_forward_distance() - distance
+                        if math.fabs(err_for) <= self.linear_precision_pref * 10:
+                            self.rotate(90)
+                        else:
+                            self.move_linear(err_for)
+                        return
                     # Turn toward left opening
                     if self.left_far(distance):
-                        self.move_linear(distance/2)
+                        self.move_linear(distance / 2)
                     self.rotate(-90)
                     if self.left_far(distance):
-                        self.move_linear(distance*2)
+                        self.move_linear(distance * 2)
                     else:
                         self.move_linear(distance)
                     if not self.left_far(distance):
@@ -396,14 +419,23 @@ class Emoo(RosBot):
             # If we are very close to the wall, rotate away slightly as a failsafe.
             if self.get_left_wall_distance() < 0.2:
                 self.rotate(10)
+                self.move_linear(0.05)
             self.pid_left(error)
         else:
             if self.get_forward_distance() <= distance + self.linear_precision_pref or self.right_far(distance):
+                # If left and right walls appear very far, rotate 90deg left and align with forward wall
+                if self.left_very_far(distance) and self.right_very_far(distance) and self.get_forward_distance() < distance * 5:
+                    err_for = self.get_forward_distance() - distance
+                    if math.fabs(err_for) <= self.linear_precision_pref * 10:
+                        self.rotate(-90)
+                    else:
+                        self.move_linear(err_for)
+                    return
                 if self.right_far(distance):
                     # Turn toward right opening
-                    self.move_linear(distance/2)
+                    self.move_linear(distance / 2)
                     self.rotate(90)
-                    self.move_linear(distance*2)
+                    self.move_linear(distance * 2)
                     if not self.right_far(distance):
                         self.align_right(distance)
                 elif self.get_left_wall_distance() > self.get_right_wall_distance():
@@ -420,6 +452,7 @@ class Emoo(RosBot):
             # If we are very close to the wall, rotate away slightly as a failsafe.
             if self.get_right_wall_distance() < 0.2:
                 self.rotate(-10)
+                self.move_linear(0.05)
             self.pid_right(error)
 
     # Move forward until reaching input distance from an object
@@ -452,100 +485,62 @@ class Emoo(RosBot):
                 # Move left
                 self.pid_left(error_right)
 
-    # # Turn left according to specified PID error (forward and left)
-    # def pid_left(self, error_forward, error_left):
-    #     error_forward *= self.pid_k
-    #     error_left *= self.pid_k
-    #     error_forward = self.cap_error(error_forward, self.braking_distance)
-    #     error_left = self.cap_error(error_left, self.wall_following_aggression)
-    #     self.set_right_motors_velocity(error_forward * self.max_motor_velocity)
-    #     error_left = self.cap_error(error_left, self.wall_following_aggression)
-    #     self.set_left_motors_velocity(error_forward * self.max_motor_velocity * (1 - error_left))
-    #     return
-    #
-    # # Turn right according to specified PID error (forward and right)
-    # def pid_right(self, error_forward, error_right):
-    #     error_forward *= self.pid_k
-    #     error_right *= self.pid_k
-    #     error_forward = self.cap_error(error_forward, self.braking_distance)
-    #     error_right = self.cap_error(error_right, self.wall_following_aggression)
-    #     self.set_left_motors_velocity(error_forward * self.max_motor_velocity)
-    #     error_right = self.cap_error(error_right, self.wall_following_aggression)
-    #     self.set_right_motors_velocity(error_forward * self.max_motor_velocity * (1 - error_right))
-    #     return
-    #
-    # def get_left_wall_distance(self):
-    #     return self.detect_closest(90, 60)
-    #
-    # def get_right_wall_distance(self):
-    #     return self.detect_closest(-90, 60)
-    #
-    # def correct_left_wall_distance(self, error):
-    #     error *= self.pid_k
-    #     radius = error / 2
-    #     self.move_arc_angle(90, -radius)
-    #     self.move_arc_angle(90, radius)
-    #     return
-    #
-    # def correct_right_wall_distance(self, error):
-    #     return
-    #
-    # def correct_wall_distance(self, wall, pref):
-    #     if wall == "left":
-    #         error = self.get_left_wall_distance() - pref
-    #         print("\nerror")
-    #         print(error)
-    #         if math.fabs(error) > self.wall_error_precision_pref:
-    #             print("correcting")
-    #             self.correct_left_wall_distance(error)
-    #         else:
-    #             self.move_within(pref)
-    #         return
-    #     elif wall == "right":
-    #         error = self.get_right_wall_distance() - pref
-    #         self.correct_right_wall_distance(error)
-    #         return
-    #
-    #
-    #
-    # # Follow specified wall at specified distance.
-    # # Will make 90 degree turns against the specified wall when encountering a corner
-    # def follow_wall(self, wall="left", distance=0.3):
-    #     self.correct_wall_distance(wall, distance)
-    #
-    #     # error_forward = self.detect_distance(180) - distance
-    #     # error_left = self.detect_distance(90) - distance
-    #     # error_right = self.detect_distance(-90) - distance
-    #     # if wall == "left":
-    #     #     # Follow left wall... duh
-    #     #     if error_forward <= 0 + self.linear_precision_pref:
-    #     #         self.rotate(90)
-    #     #     else:
-    #     #         # If within wall_error_precision_pref, continue forward.
-    #     #         # Otherwise, turn slightly in the appropriate direction
-    #     #         if error_left > self.wall_error_precision_pref:
-    #     #             # Turn toward wall
-    #     #             self.pid_left(error_forward, error_left)
-    #     #         elif error_left < -self.wall_error_precision_pref:
-    #     #             # Turn away from wall
-    #     #             self.pid_right(error_forward, error_left)
-    #     #         else:
-    #     #             # Forward
-    #     #             self.pid_forward(1)
-    #     # elif wall == "right":
-    #     #     # Follow right wall... duh
-    #     #     if error_forward <= 0 + self.linear_precision_pref:
-    #     #         print(error_forward)
-    #     #         self.rotate(-90)
-    #     #     else:
-    #     #         # Same stuff, other direction
-    #     #         if error_right > self.wall_error_precision_pref:
-    #     #             self.pid_right(error_forward, error_right)
-    #     #         elif error_right < -self.wall_error_precision_pref:
-    #     #             print("LEFT")
-    #     #             print(error_right)
-    #     #             self.pid_left(error_forward, error_right)
-    #     #         else:
-    #     #             self.pid_forward(1)
-    #     # else:
-    #     #     print("What")
+    # Start of Camera-Based Functions
+
+    # Attempt to find target object.
+    # Returns an array containing relative distance and angle to object
+    def find_target(self):
+        rec_all = self.rgb_camera.getRecognitionObjects()
+        if len(rec_all) > 0:
+            # An object is found
+            target = rec_all[0]
+            # Attempt to ascertain relative angle.
+            # Important: detection begins at position 3, not 0.
+            # Total camera FOV is 62deg
+            position_horizontal = target.getPositionOnImage()[0] - 3
+            ratio_horizontal = position_horizontal / self.camera_resolution[0]
+            angle_from_right = self.camera_fov[0] * ratio_horizontal
+            angle_from_forward = angle_from_right - self.camera_fov[0] / 2
+            # Now attempt to ascertain distance to target.
+            # Knowing the size of sought target, the relative size can be used
+            # As this will be done with horizontal measurements, partial occlusion from walls is no problem.
+            size_horizontal = target.getSizeOnImage()[0]
+            # Get visual angle of target
+            # This will be sensitive to the fish-eye effect, but this will be ignored.
+            # This will be naturally handled by rotation toward the object.
+            ratio_horizontal_size = size_horizontal / self.camera_resolution[0]
+            target_visual_angle = self.camera_fov[0] * ratio_horizontal_size
+            # Using half of the visual angle, construct right triangle with true size as opposite and d as adjacent
+            half_angle = target_visual_angle / 2
+            half_size = self.target_size[1] / 2
+            distance = math.fabs(half_size / math.tan(half_angle * (math.pi / 180)))
+            # Correction factor of -0.11127738671450094
+            return [distance - 0.11127738671450094, angle_from_forward]
+        return []
+
+    def approach_target(self, distance=0.3):
+        target = self.find_target()
+        if not len(target) > 0:
+            # Target not found at all. Rotate until visible.
+            self.rotate(self.camera_fov[0] / 2)
+        else:
+            # Target found. Adjust angle to within reason and approach
+            target_angle = target[1]
+            error = target[0] - distance
+            if math.fabs(target_angle) > (self.target_angle_width / 2):
+                self.rotate(target_angle)
+            if error > self.linear_precision_pref:
+                self.pid_linear(math.fabs(error))
+            else:
+                self.stop()
+
+    def bug_zero(self, wall="left", distance=0.3):
+        target = self.find_target()
+        if not len(target) > 0:
+            # Target not found at all. Wall follow until visible
+            self.follow_wall(wall, distance)
+        elif target[0] > self.detect_distance(180 + target[1]):
+            self.follow_wall(wall, distance)
+        else:
+            # Target found. Adjust angle to within reason and approach
+            self.approach_target(distance)
