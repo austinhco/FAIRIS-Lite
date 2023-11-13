@@ -18,6 +18,10 @@ class Emoo(RosBot):
 
     # Print velocities and times before moving
     noisy = False
+    # Print pose at every timestep
+    pose_always = True
+    # print grid at every timestep
+    grid_always = False
 
     # Behavioral Preference Parameters
     speed_pref = 5  # radians per second per wheel
@@ -67,7 +71,7 @@ class Emoo(RosBot):
     grid_dims = [1, 1]  # Size of grid in cells
     cell_len = 1  # Size of cell in m (cells = cell_len x cell_len squares)
     landmarks = []  # Landmarks: List of landmarks as [[r,g,b], [x, y]]
-    visited = []  # list of visited cells
+    visited = set([])  # list of visited cells
 
     # Override stop function to add state update
     def stop(self):
@@ -88,12 +92,17 @@ class Emoo(RosBot):
 
     # Update position estimate
     def update_estimates(self):
+        if "ROTATE" in self.state:
+            return
         heading = self.get_compass_reading() * (math.pi / 180)
         distance = self.calculate_distance(statistics.mean([self.last_fle, self.last_fre]))
         self.estimated_x += distance * math.cos(heading)
         self.estimated_y += distance * math.sin(heading)
         self.last_fre = self.relative_fre()
         self.last_fle = self.relative_fle()
+        # Update visited cells if we are in a new one
+        cell = self.coord_to_cell(self.estimated_x, self.estimated_y)
+        self.visited.add(cell)
         return
 
     # Calculate distance travelled since input encoder start point
@@ -139,13 +148,37 @@ class Emoo(RosBot):
         sys.stdout.write("\r" + pose_str)
         sys.stdout.flush()
 
+    def print_grid(self):
+        grid = [[' . ' for i in range(self.grid_dims[0])] for j in range(self.grid_dims[1])]
+        for cell in self.visited:
+            grid[cell[0]+math.floor(self.grid_dims[0]/2)][cell[1]+math.floor(self.grid_dims[1]/2)] = ' X '
+        for j in range(-1, self.grid_dims[1]+1):
+            # Print full line
+            row = []
+            for i in range(-1, self.grid_dims[0]+1):
+                if j == -1 or j == self.grid_dims[1]:
+                    if i == -1 or i == self.grid_dims[0]:
+                        row.append(' + ')
+                        continue
+                    row.append(' - ')
+                    continue
+                if i == -1 or i == self.grid_dims[0]:
+                    row.append(' | ')
+                    continue
+                # Add items to row
+                row.append(grid[i][j])
+            print(''.join(row))
+        return
+
     # Advance time (unless stop signal)
-    def advance(self, quiet=False):
+    def advance(self):
         if self.step(int(self.getBasicTimeStep())) == -1:
             exit(0)
         self.update_estimates()
-        if not quiet:
+        if self.pose_always:
             self.print_pose()
+        if self.grid_always:
+            self.print_grid()
 
     # Get relative total distance traveled based on initial encoder readings
     def relative_fle(self):
@@ -205,6 +238,7 @@ class Emoo(RosBot):
     # + clockwise/- counterclockwise
     # Rotation angles above 180deg will be cut or redirected to the minimal path
     def rotate(self, angle):
+        self.state = "ROTATE"
         # Rectify input
         while angle > 180:
             angle -= 360
@@ -226,18 +260,20 @@ class Emoo(RosBot):
             elif angle < 0:
                 self.set_left_motors_velocity(-self.rotational_speed_pref)
                 self.set_right_motors_velocity(self.rotational_speed_pref)
-            self.advance(True)
+            self.advance()
         self.stop()
 
     # Rotate to specific compass reading
-    def rotate_to(self, angle, precision=-1):
+    def rotate_to(self, angle):
+        self.state = "ROTATE"
         while angle > 360:
             angle -= 360
         while angle <= 0:
             angle += 360
         # set rotation direction
         dir = self.get_compass_reading() + 180 < angle
-        while not self.get_compass_reading() == angle or (angle == 360 and self.get_compass_reading() == 0):
+        while (not self.get_compass_reading() == angle) or \
+                (angle == 360 and not (self.get_compass_reading() == 0 or self.get_compass_reading() == 360)):
             if dir:
                 self.set_left_motors_velocity(1)
                 self.set_right_motors_velocity(-1)
@@ -540,8 +576,14 @@ class Emoo(RosBot):
             half_angle = target_visual_angle / 2
             half_size = self.target_size[1] / 2
             distance = math.fabs(half_size / math.tan(half_angle * (math.pi / 180)))
+            # Weird
+            target_colors = target.getColors()
+            r = round(target_colors[0])
+            g = round(target_colors[1])
+            b = round(target_colors[2])
+            color = [r, g, b]
             # Correction factor of -0.11127738671450094
-            return [distance - 0.11127738671450094, angle_from_forward, target.getColors()]
+            return [distance - 0.11127738671450094, angle_from_forward, color]
         return []
 
     def approach_target(self, distance=0.3):
@@ -573,21 +615,76 @@ class Emoo(RosBot):
 
     # Start of Localization Functions
 
+    # Convert the input x and y coordinates to a cell coordinate on the map grid, bearing in mind:
+    # 1 cell is defined by self.cell_len
+    # The center of the grid is defined at 0,0 (intersection between cells at [1,1],[-1,1],[-1,-1],[-1,-1]
+    # Up = Negative
+    # Right = Positive
+    def coord_to_cell(self, x, y):
+        cell_x = math.floor(x / self.cell_len)
+        cell_y = math.floor(-y / self.cell_len)
+        return tuple([cell_x, cell_y])
+
     # Get angles and colors of all visible landmarks
     def find_landmarks(self):
-        # Orient north, then rotate fully, remembering landmark angles
+        # Orient north, then rotate fully, remembering landmark distances
+        landmarks = []
         self.rotate_to(90)
         for i in range(360):
             # Seek landmarks. If we see one, update its compass angle from our position
             # Do this only when the object is centered to avoid fisheye artifacts as much as possible
             target = self.find_target()
             if target:
-                print("Found Color:")
-                print(target[2][0])
+                color = target[2]
+                angle = target[1]
+                distance = target[0]
+                # Determine which landmark this is and its coordinates
+                coords = []
+                for landmark in self.landmarks:
+                    if landmark[0] == color:
+                        coords = landmark[1]
+                        break
+                if math.fabs(angle) < self.angular_precision_pref:
+                    new_landmark = [coords, distance, angle]
+                    already = 0
+                    for landmark in landmarks:
+                        if landmark[0] == new_landmark[0]:
+                            already = 1
+                    if not already:
+                        landmarks.append(new_landmark)
             self.rotate_to(90+i)
-        return
+        # Re-orient north since we may be slightly off
+        self.rotate_to(90)
+        return landmarks
 
     # Using predefined map information (grid dimensions, landmark positions,
     # determine which cell we are in, and where in that cell
     def triangulate(self):
-        return
+        # If there are less than 3 landmarks, give up, since we cannot use angles.
+        landmarks = self.find_landmarks()
+        if len(landmarks) < 3:
+            return
+        # We have 3 landmarks (at least). Separate them into usable bits
+        L1 = landmarks[0]
+        L2 = landmarks[1]
+        L3 = landmarks[2]
+        # Circle information for each [cx, cy, r]
+        C1 = [L1[0][0], L1[0][1], L1[1]]
+        C2 = [L2[0][0], L2[0][1], L2[1]]
+        C3 = [L3[0][0], L3[0][1], L3[1]]
+        # ABCDEF according to Trilateration algorithm described in slide
+        A = (-2 * C1[0]) + (2 * C2[0])
+        B = (-2 * C1[1]) + (2 * C2[1])
+        C = math.pow(C1[2], 2) - math.pow(C2[2], 2) - math.pow(C1[0], 2) + math.pow(C2[0], 2) - math.pow(C1[1], 2) + math.pow(C2[1], 2)
+        D = (-2 * C2[0]) + (2 * C3[0])
+        E = (-2 * C2[1]) + (2 * C3[1])
+        F = math.pow(C2[2], 2) - math.pow(C3[2], 2) - math.pow(C2[0], 2) + math.pow(C3[0], 2) - math.pow(C2[1], 2) + math.pow(C3[1], 2)
+        # Exception as stated in slide:
+        if E * A == B * D:
+            return []
+        # Final calculation
+        x = ((C*E) - (F*B)) / ((E*A) - (B*D))
+        y = ((C*D) - (A*F)) / ((B*D) - (A*E))
+        self.estimated_x = x
+        self.estimated_y = y
+        return tuple([x, y])

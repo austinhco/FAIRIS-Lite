@@ -23,12 +23,17 @@ emoo.move_to_start()
 emoo.initial_fle = emoo.get_front_left_motor_encoder_reading()
 emoo.initial_fre = emoo.get_front_right_motor_encoder_reading()
 
+# Status printing
+emoo.noisy = False
+emoo.pose_always = False
+emoo.grid_always = False
+
 # Set behavioral parameters
 emoo.speed_pref = 10
 emoo.angular_speed_pref = 10
 emoo.rotational_speed_pref = 2
 emoo.linear_precision_pref = 0.005
-emoo.angular_precision_pref = 3
+emoo.angular_precision_pref = 1
 emoo.wall_error_precision_pref = 0.05
 emoo.braking_distance = 0.5
 emoo.braking_velocity = 10
@@ -60,5 +65,5 @@ emoo.landmarks = [[[1, 1, 0], [-2, 2]],
 
 while 1:
     # World can be changed on line 18
-    emoo.find_landmarks()
+    emoo.triangulate()
     emoo.advance()
