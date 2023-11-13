@@ -50,7 +50,15 @@ emoo.estimated_y = 0
 # Target properties
 emoo.target_size = [1.5, 0.5]  # [Height, Diameter]
 
+# Localization info NOTE: Cells are organized such that UP/NORTH is NEGATIVE
+emoo.grid_dims = [4, 4]
+emoo.cell_len = 1
+emoo.landmarks = [[[1, 1, 0], [-2, 2]],
+                  [[0, 1, 0], [-2, -2]],
+                  [[1, 0, 0], [2, 2]],
+                  [[0, 0, 1], [2, -2]]]
+
 while 1:
     # World can be changed on line 18
-
+    emoo.find_landmarks()
     emoo.advance()

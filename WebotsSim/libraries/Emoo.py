@@ -53,6 +53,8 @@ class Emoo(RosBot):
     # Position estimates
     estimated_x = 0
     estimated_y = 0
+    cell_x = 0
+    cell_y = 0
 
     # Last encoder readings
     last_fle = 0
@@ -60,6 +62,12 @@ class Emoo(RosBot):
 
     # Camera target information
     target_size = [0, 0]
+
+    # Map and landmark information
+    grid_dims = [1, 1]  # Size of grid in cells
+    cell_len = 1  # Size of cell in m (cells = cell_len x cell_len squares)
+    landmarks = []  # Landmarks: List of landmarks as [[r,g,b], [x, y]]
+    visited = []  # list of visited cells
 
     # Override stop function to add state update
     def stop(self):
@@ -219,6 +227,24 @@ class Emoo(RosBot):
                 self.set_left_motors_velocity(-self.rotational_speed_pref)
                 self.set_right_motors_velocity(self.rotational_speed_pref)
             self.advance(True)
+        self.stop()
+
+    # Rotate to specific compass reading
+    def rotate_to(self, angle, precision=-1):
+        while angle > 360:
+            angle -= 360
+        while angle <= 0:
+            angle += 360
+        # set rotation direction
+        dir = self.get_compass_reading() + 180 < angle
+        while not self.get_compass_reading() == angle or (angle == 360 and self.get_compass_reading() == 0):
+            if dir:
+                self.set_left_motors_velocity(1)
+                self.set_right_motors_velocity(-1)
+            else:
+                self.set_left_motors_velocity(-1)
+                self.set_right_motors_velocity(1)
+            self.advance()
         self.stop()
 
     # PID-based functions start here
@@ -515,7 +541,7 @@ class Emoo(RosBot):
             half_size = self.target_size[1] / 2
             distance = math.fabs(half_size / math.tan(half_angle * (math.pi / 180)))
             # Correction factor of -0.11127738671450094
-            return [distance - 0.11127738671450094, angle_from_forward]
+            return [distance - 0.11127738671450094, angle_from_forward, target.getColors()]
         return []
 
     def approach_target(self, distance=0.3):
@@ -544,3 +570,24 @@ class Emoo(RosBot):
         else:
             # Target found. Adjust angle to within reason and approach
             self.approach_target(distance)
+
+    # Start of Localization Functions
+
+    # Get angles and colors of all visible landmarks
+    def find_landmarks(self):
+        # Orient north, then rotate fully, remembering landmark angles
+        self.rotate_to(90)
+        for i in range(360):
+            # Seek landmarks. If we see one, update its compass angle from our position
+            # Do this only when the object is centered to avoid fisheye artifacts as much as possible
+            target = self.find_target()
+            if target:
+                print("Found Color:")
+                print(target[2][0])
+            self.rotate_to(90+i)
+        return
+
+    # Using predefined map information (grid dimensions, landmark positions,
+    # determine which cell we are in, and where in that cell
+    def triangulate(self):
+        return
