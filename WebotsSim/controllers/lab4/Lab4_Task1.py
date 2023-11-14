@@ -2,6 +2,8 @@
 
 import math
 
+import numpy
+
 # You may need to import some classes of the controller module. Ex:
 #  from controller import Robot, Motor, DistanceSensor
 from WebotsSim.libraries.Emoo import Emoo
@@ -15,7 +17,7 @@ emoo = Emoo()
 
 # reset robot position
 # Loads the environment from the maze file
-maze_file = 'worlds/mazes/Labs/Lab4/Lab4_Task1.xml'
+maze_file = 'worlds/mazes/Labs/Lab4/Lab4_Task2_1.xml'
 emoo.load_environment(maze_file)
 emoo.move_to_start()
 
@@ -31,7 +33,7 @@ emoo.grid_always = False
 # Set behavioral parameters
 emoo.speed_pref = 10
 emoo.angular_speed_pref = 10
-emoo.rotational_speed_pref = 2
+emoo.rotational_speed_pref = 0.8
 emoo.linear_precision_pref = 0.005
 emoo.angular_precision_pref = 1
 emoo.wall_error_precision_pref = 0.05
@@ -62,8 +64,33 @@ emoo.landmarks = [[[1, 1, 0], [-2, 2]],
                   [[0, 1, 0], [-2, -2]],
                   [[1, 0, 0], [2, 2]],
                   [[0, 0, 1], [2, -2]]]
+# Task 2 Map 1
+emoo.cell_walls = [['WN', 'SN', 'SN', 'NE'],
+                   ['SW', 'SN', 'NE', 'WE'],
+                   ['WN', 'SN', 'SE', 'WE'],
+                   ['SW', 'SN', 'SN', 'SE']]
+# Task 2 Map 2
+# emoo.cell_walls = [['WN', 'SN', 'SN', 'NE'],
+#                    ['SW', 'N', 'NE', 'WE'],
+#                    ['WNE', 'SW', 'SE', 'WE'],
+#                    ['SW', 'SN', 'SN', 'SE']]
+# Task 2 Map 3
+# emoo.cell_walls = [['SNW', 'SN', 'N', 'NE'],
+#                    ['WN', 'NE', 'WE', 'WE'],
+#                    ['WE', 'SW', 'SE', 'WE'],
+#                    ['SW', 'SN', 'SN', 'SE']]
+emoo.cell_walls = numpy.transpose(numpy.array(emoo.cell_walls))
+# Initialize probabilities
+for j in range(emoo.grid_dims[1]):
+    row = []
+    for i in range(emoo.grid_dims[0]):
+        row.append(1/(emoo.grid_dims[0]*emoo.grid_dims[1]))
+    emoo.cell_probs.append(row)
 
 while 1:
     # World can be changed on line 18
-    emoo.triangulate()
+    # if len(emoo.visited) + len(emoo.occupied) < emoo.grid_dims[0] * emoo.grid_dims[1]:
+    #     emoo.trilaterate()
+    #     emoo.navigate_grid()
+    emoo.wall_estimate_cell()
     emoo.advance()

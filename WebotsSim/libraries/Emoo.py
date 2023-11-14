@@ -4,6 +4,8 @@ import math
 import statistics
 import sys
 
+import numpy
+
 from WebotsSim.libraries.RobotLib.RosBot import RosBot
 
 
@@ -71,7 +73,11 @@ class Emoo(RosBot):
     grid_dims = [1, 1]  # Size of grid in cells
     cell_len = 1  # Size of cell in m (cells = cell_len x cell_len squares)
     landmarks = []  # Landmarks: List of landmarks as [[r,g,b], [x, y]]
+    cell_walls = []  # Wall characteristics for all walls
+    cell_probs = []  # Probabilities (that emoo is in it) for each cell
     visited = set([])  # list of visited cells
+    occupied = set([])  # list of obstacle cells
+    previous_moves = []  # list of prior cell movements
 
     # Override stop function to add state update
     def stop(self):
@@ -152,6 +158,10 @@ class Emoo(RosBot):
         grid = [[' . ' for i in range(self.grid_dims[0])] for j in range(self.grid_dims[1])]
         for cell in self.visited:
             grid[cell[0]+math.floor(self.grid_dims[0]/2)][cell[1]+math.floor(self.grid_dims[1]/2)] = ' X '
+        for cell in self.occupied:
+            grid[cell[0]+math.floor(self.grid_dims[0]/2)][cell[1]+math.floor(self.grid_dims[1]/2)] = ' O '
+        bot_cell = self.coord_to_cell(self.estimated_x, self.estimated_y)
+        grid[bot_cell[0] + math.floor(self.grid_dims[0] / 2)][bot_cell[1] + math.floor(self.grid_dims[1] / 2)] = ' ▪ '
         for j in range(-1, self.grid_dims[1]+1):
             # Print full line
             row = []
@@ -168,6 +178,10 @@ class Emoo(RosBot):
                 # Add items to row
                 row.append(grid[i][j])
             print(''.join(row))
+        # Also print estimated coordinates and cell
+        print(f"Cell: X: {bot_cell[0]}, Y: {bot_cell[1]}, Confidence: {self.cell_probs[bot_cell[0]][bot_cell[1]]}\n"
+              f"Exact Coordinates: X: {self.estimated_x:.2f}, Y: {self.estimated_y:.2f}, "
+              f"θ: {self.get_compass_reading()}")
         return
 
     # Advance time (unless stop signal)
@@ -265,23 +279,7 @@ class Emoo(RosBot):
 
     # Rotate to specific compass reading
     def rotate_to(self, angle):
-        self.state = "ROTATE"
-        while angle > 360:
-            angle -= 360
-        while angle <= 0:
-            angle += 360
-        # set rotation direction
-        dir = self.get_compass_reading() + 180 < angle
-        while (not self.get_compass_reading() == angle) or \
-                (angle == 360 and not (self.get_compass_reading() == 0 or self.get_compass_reading() == 360)):
-            if dir:
-                self.set_left_motors_velocity(1)
-                self.set_right_motors_velocity(-1)
-            else:
-                self.set_left_motors_velocity(-1)
-                self.set_right_motors_velocity(1)
-            self.advance()
-        self.stop()
+        self.rotate(self.get_compass_reading() - angle)
 
     # PID-based functions start here
 
@@ -615,6 +613,12 @@ class Emoo(RosBot):
 
     # Start of Localization Functions
 
+    def p_to_logsodd(self, p):
+        return numpy.log(p / (1 - p))
+
+    def logsodd_to_p(self, logsodd):
+        return 1 - (1 / (1 + math.pow(math.e, logsodd)))
+
     # Convert the input x and y coordinates to a cell coordinate on the map grid, bearing in mind:
     # 1 cell is defined by self.cell_len
     # The center of the grid is defined at 0,0 (intersection between cells at [1,1],[-1,1],[-1,-1],[-1,-1]
@@ -624,6 +628,28 @@ class Emoo(RosBot):
         cell_x = math.floor(x / self.cell_len)
         cell_y = math.floor(-y / self.cell_len)
         return tuple([cell_x, cell_y])
+
+    # Check if cell is in bounds
+    def cell_in_bounds(self, cell):
+        left = -math.floor(self.grid_dims[0] / 2)
+        right = math.floor(self.grid_dims[0] / 2) - 1
+        top = -math.floor(self.grid_dims[1] / 2)
+        bottom = math.floor(self.grid_dims[1] / 2) - 1
+        x = cell[0]
+        y = cell[1]
+        return not (x < left or x > right or y < top or y > bottom)
+
+    # Check if cell is visited
+    def cell_visited(self, cell):
+        return tuple(cell) in frozenset(self.visited)
+
+    # Check if cell is occupied
+    def cell_occupied(self, cell):
+        return tuple(cell) in frozenset(self.occupied)
+
+    # Check if cell is unoccupied and unvisited and in bounds
+    def cell_open(self, cell):
+        return (not (self.cell_visited(cell) or self.cell_occupied(cell))) and self.cell_in_bounds(cell)
 
     # Get angles and colors of all visible landmarks
     def find_landmarks(self):
@@ -659,7 +685,7 @@ class Emoo(RosBot):
 
     # Using predefined map information (grid dimensions, landmark positions,
     # determine which cell we are in, and where in that cell
-    def triangulate(self):
+    def trilaterate(self):
         # If there are less than 3 landmarks, give up, since we cannot use angles.
         landmarks = self.find_landmarks()
         if len(landmarks) < 3:
@@ -688,3 +714,157 @@ class Emoo(RosBot):
         self.estimated_x = x
         self.estimated_y = y
         return tuple([x, y])
+
+    # Navigate one cell in any particular direction
+    def move_cell_left(self):
+        self.rotate_to(180)
+        self.move_linear(self.cell_len)
+        self.previous_moves.append('L')
+
+    def move_cell_right(self):
+        self.rotate_to(0)
+        self.move_linear(self.cell_len)
+        self.previous_moves.append('R')
+
+    def move_cell_up(self):
+        self.rotate_to(90)
+        self.move_linear(self.cell_len)
+        self.previous_moves.append('U')
+
+    def move_cell_down(self):
+        self.rotate_to(270)
+        self.move_linear(self.cell_len)
+        self.previous_moves.append('D')
+
+    # Undo last known cell movement and return what it was
+    def undo_last_cell_move(self):
+        last = self.previous_moves[len(self.previous_moves)-1]
+        self.previous_moves.pop()
+        if last == 'L':
+            self.move_cell_right()
+        elif last == 'R':
+            self.move_cell_left()
+        elif last == 'U':
+            self.move_cell_down()
+        elif last == 'D':
+            self.move_cell_up()
+        self.previous_moves.pop()
+        return last
+
+    # Calculate a path through every grid cell while avoiding pre-visited or occupied cells
+    def navigate_grid(self):
+        start = self.coord_to_cell(self.estimated_x, self.estimated_y)
+        left = [start[0]-1, start[1]]
+        up = [start[0], start[1]-1]
+        down = [start[0], start[1]+1]
+        right = [start[0]+1, start[1]]
+        # It goes like this:
+        # Routine: Avoid all obstacles AND visited spaces
+        #   1. Left?
+        #   2. Up?
+        #   3. Down?
+        #   4. Right?
+        #   5. If none, undo last move and try again
+        # Repeat until the sum of visited and occupied cells is all cells
+        while len(self.visited) + len(self.occupied) < self.grid_dims[0] * self.grid_dims[1]:
+            self.print_grid()
+            if self.cell_open(left):
+                self.move_cell_left()
+                left[0] -= 1
+                up[0] -= 1
+                down[0] -= 1
+                right[0] -= 1
+            elif self.cell_open(up):
+                self.move_cell_up()
+                left[1] -= 1
+                up[1] -= 1
+                down[1] -= 1
+                right[1] -= 1
+            elif self.cell_open(down):
+                self.move_cell_down()
+                left[1] += 1
+                up[1] += 1
+                down[1] += 1
+                right[1] += 1
+            elif self.cell_open(right):
+                self.move_cell_right()
+                left[0] += 1
+                up[0] += 1
+                down[0] += 1
+                right[0] += 1
+            else:
+                last = self.undo_last_cell_move()
+                if last == 'L':
+                    left[0] += 1
+                    up[0] += 1
+                    down[0] += 1
+                    right[0] += 1
+                elif last == 'R':
+                    left[0] -= 1
+                    up[0] -= 1
+                    down[0] -= 1
+                    right[0] -= 1
+                elif last == 'U':
+                    left[1] += 1
+                    up[1] += 1
+                    down[1] += 1
+                    right[1] += 1
+                elif last == 'D':
+                    left[1] -= 1
+                    up[1] -= 1
+                    down[1] -= 1
+                    right[1] -= 1
+        self.print_grid()
+
+    # Detect whether or not a wall is present in a given direction
+    def wall_behind(self):
+        return self.detect_closest(0, 10) < self.cell_len
+
+    def wall_left(self):
+        return self.detect_closest(90, 10) < self.cell_len
+
+    def wall_front(self):
+        return self.detect_closest(180, 10) < self.cell_len
+
+    def wall_right(self):
+        return self.detect_closest(-90, 10) < self.cell_len
+
+    # Determine the wall characteristics of the current cell, with confidence level
+    def detect_walls(self):
+        self.rotate_to(90)
+        walls = ""
+        confidence = 1
+        if self.wall_behind():
+            walls += 'S'
+            confidence *= 0.9
+        else:
+            confidence *= 0.7
+        if self.wall_left():
+            walls += 'W'
+            confidence *= 0.9
+        else:
+            confidence *= 0.7
+        if self.wall_front():
+            walls += 'N'
+            confidence *= 0.9
+        else:
+            confidence *= 0.7
+        if self.wall_right():
+            walls += 'E'
+            confidence *= 0.9
+        else:
+            confidence *= 0.7
+        return [walls, confidence]
+
+    # Assess which cell we are probably in
+    def wall_estimate_cell(self):
+        walls = self.detect_walls()
+        dirs = walls[0]
+        confidence = walls[1]
+        # Obtain potential matches
+        matches = []
+        for j in range(self.grid_dims[1]):
+            for i in range(self.grid_dims[0]):
+                if self.cell_walls[i][j] == dirs:
+                    matches.append([i, j])
+
