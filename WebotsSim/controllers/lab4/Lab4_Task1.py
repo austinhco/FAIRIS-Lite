@@ -89,6 +89,7 @@ for j in range(emoo.grid_dims[1]):
 starting_cell = emoo.coord_to_cell(emoo.starting_position.x+2, emoo.starting_position.y-2)
 emoo.assert_probs_position(starting_cell[0], starting_cell[1])
 
+emoo.move_probably('E')
 while 1:
     # World can be changed on line 18
     # if len(emoo.visited) + len(emoo.occupied) < emoo.grid_dims[0] * emoo.grid_dims[1]:
@@ -97,5 +98,5 @@ while 1:
     emoo.wall_estimate_cell()
     emoo.print_probs()
     print(emoo.guess_cell())
-    emoo.move_probably('E')
+    emoo.move_probably('N')
     emoo.advance()

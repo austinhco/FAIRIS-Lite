@@ -936,6 +936,11 @@ class Emoo(RosBot):
         self.move_linear(self.cell_len)
 
     # Navigate based on position probabilities and known visited cells
+    # This algorithm will be pretty much identical to the open grid one, but also checking for walls
+    # and guessing the cell we're in.
+    # This guessing may lead to "teleportation" where the bot suddenly changes its estimated position,
+    # but the visitation memory and undoing routine should allow for visiting cells of broken branches anyway.
+    # Importantly as well, these "teleportations" must also translate the list of visited cells congruently.
     def navigate_wall_probs(self):
 
         return
