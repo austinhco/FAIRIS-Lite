@@ -106,9 +106,6 @@ class Emoo(RosBot):
         self.estimated_y += distance * math.sin(heading)
         self.last_fre = self.relative_fre()
         self.last_fle = self.relative_fle()
-        # Update visited cells if we are in a new one
-        cell = self.coord_to_cell(self.estimated_x, self.estimated_y)
-        self.visited.add(cell)
         return
 
     # Calculate distance travelled since input encoder start point
@@ -179,7 +176,8 @@ class Emoo(RosBot):
                 row.append(grid[i][j])
             print(''.join(row))
         # Also print estimated coordinates and cell
-        print(f"Cell: X: {bot_cell[0]}, Y: {bot_cell[1]}, Confidence: {self.cell_probs[bot_cell[0]][bot_cell[1]]}\n"
+        print(f"Cell: X: {bot_cell[0]}, Y: {bot_cell[1]}, Confidence: "
+              f"{self.cell_probs[bot_cell[0]+math.floor(self.grid_dims[0]/2)][bot_cell[1]+math.floor(self.grid_dims[1]/2)]}\n"
               f"Exact Coordinates: X: {self.estimated_x:.2f}, Y: {self.estimated_y:.2f}, "
               f"θ: {self.get_compass_reading()}")
         return
@@ -621,7 +619,7 @@ class Emoo(RosBot):
     # Start of Localization Functions
 
     def p_to_logsodd(self, p):
-        if p == 1:
+        if p >= 1:
             return math.inf
         return numpy.log(p / (1 - p))
 
@@ -659,6 +657,58 @@ class Emoo(RosBot):
     # Check if cell is unoccupied and unvisited and in bounds
     def cell_open(self, cell):
         return (not (self.cell_visited(cell) or self.cell_occupied(cell))) and self.cell_in_bounds(cell)
+
+    # Snap to nearest cardinal direction
+    def snap_cardinal(self):
+        self.rotate_to(self.degrees_from_cardinal(self.get_cardinal()))
+
+    # Get the current closest cardinal position
+    def get_cardinal(self):
+        return self.cardinal_from_degrees(self.get_compass_reading())
+
+    def cardinal_from_degrees(self, degrees):
+        rounded = round(degrees / 90)
+        if rounded == 0 or rounded == 4:
+            return 'E'
+        elif rounded == 1:
+            return 'N'
+        elif rounded == 2:
+            return 'W'
+        elif rounded == 3:
+            return 'S'
+
+    # Get degrees from cardinal direction
+    def degrees_from_cardinal(self, cardinal):
+        if cardinal == 'N':
+            return 90
+        elif cardinal == 'E':
+            return 0
+        elif cardinal == 'S':
+            return 270
+        elif cardinal == 'W':
+            return 180
+
+    # Check if there's a wall in the specified cardinal direction
+    def wall_in_direction(self, dir='N'):
+        self.snap_cardinal()
+        current = self.get_compass_reading()
+        dir_angle = self.degrees_from_cardinal(dir)
+        dif = dir_angle - current
+        while dif > 360:
+            dif -= 360
+        while dif < 0:
+            dif += 360
+        # now dif represents the angle from the robot that we are trying to check
+        # relative_cardinal is the direction from the robot, where N is right
+        relative_cardinal = self.cardinal_from_degrees(dif)
+        if relative_cardinal == 'S':
+            return self.wall_right()
+        elif relative_cardinal == 'W':
+            return self.wall_behind()
+        elif relative_cardinal == 'N':
+            return self.wall_left()
+        elif relative_cardinal == 'E':
+            return self.wall_front()
 
     # Get angles and colors of all visible landmarks
     def find_landmarks(self):
@@ -776,6 +826,8 @@ class Emoo(RosBot):
         #   5. If none, undo last move and try again
         # Repeat until the sum of visited and occupied cells is all cells
         while len(self.visited) + len(self.occupied) < self.grid_dims[0] * self.grid_dims[1]:
+            cell = self.coord_to_cell(self.estimated_x, self.estimated_y)
+            self.visited.add(cell)
             self.print_grid()
             if self.cell_open(left):
                 self.move_cell_left()
@@ -840,25 +892,24 @@ class Emoo(RosBot):
 
     # Determine the wall characteristics of the current cell, with confidence level
     def detect_walls(self):
-        self.rotate_to(90)
         walls = ""
         confidence = self.p_to_logsodd(0.5)
-        if self.wall_behind():
+        if self.wall_in_direction('S'):
             walls += 'S'
             confidence += 0.9
         else:
             confidence += 0.7
-        if self.wall_left():
+        if self.wall_in_direction('W'):
             walls += 'W'
             confidence += 0.9
         else:
             confidence += 0.7
-        if self.wall_front():
+        if self.wall_in_direction('N'):
             walls += 'N'
             confidence += 0.9
         else:
             confidence += 0.7
-        if self.wall_right():
+        if self.wall_in_direction('E'):
             walls += 'E'
             confidence += 0.9
         else:
@@ -893,9 +944,12 @@ class Emoo(RosBot):
     # Get most likely cell. If many are tied, take any.
     def guess_cell(self):
         index = numpy.argmax(self.cell_probs)
-        x = math.floor(index / self.grid_dims[0])
-        y = index % self.grid_dims[1]
-        return [x, y]
+        x = int(math.floor(index / self.grid_dims[0]) - (self.grid_dims[0] / 2))
+        y = int(index % self.grid_dims[1] - (self.grid_dims[1] / 2))
+        # Update coordinates according to cell guess
+        self.estimated_x = x * self.cell_len
+        self.estimated_y = -y * self.cell_len
+        return tuple([x, y])
 
     # Normalize probs to sum to 1
     def normalize_probs(self):
@@ -914,26 +968,26 @@ class Emoo(RosBot):
     # Move one cell length in specified compass direction while applying motion model to cell probs
     def move_probably(self, dir='N'):
         current = self.guess_cell()
-        x = current[0]
-        y = current[1]
+        x = current[0] - math.floor(self.grid_dims[0] / 2)
+        y = current[1] - math.floor(self.grid_dims[1] / 2)
         if dir == 'N':
-            self.rotate_to(90)
+            self.move_cell_up()
             self.update_cell_prob(x, y, 0.2, True)
             self.update_cell_prob(x, y - 1, 0.8, True)
         elif dir == 'E':
-            self.rotate_to(0)
+            self.move_cell_right()
             self.update_cell_prob(x, y, 0.2, True)
             self.update_cell_prob(x + 1, y, 0.8, True)
         elif dir == 'S':
-            self.rotate_to(-90)
+            self.move_cell_down()
             self.update_cell_prob(x, y, 0.2, True)
             self.update_cell_prob(x, y + 1, 0.8, True)
         elif dir == 'W':
-            self.rotate_to(180)
+            self.move_cell_left()
             self.update_cell_prob(x, y, 0.2, True)
             self.update_cell_prob(x - 1, y, 0.8, True)
         self.normalize_probs()
-        self.move_linear(self.cell_len)
+        self.guess_cell()
 
     # Navigate based on position probabilities and known visited cells
     # This algorithm will be pretty much identical to the open grid one, but also checking for walls
@@ -942,5 +996,68 @@ class Emoo(RosBot):
     # but the visitation memory and undoing routine should allow for visiting cells of broken branches anyway.
     # Importantly as well, these "teleportations" must also translate the list of visited cells congruently.
     def navigate_wall_probs(self):
-
-        return
+        self.wall_estimate_cell()
+        start = self.guess_cell()
+        left = [start[0] - 1, start[1]]
+        up = [start[0], start[1] - 1]
+        down = [start[0], start[1] + 1]
+        right = [start[0] + 1, start[1]]
+        # It goes like this:
+        # Routine: Avoid all obstacles AND visited spaces
+        #   1. Left?
+        #   2. Up?
+        #   3. Down?
+        #   4. Right?
+        #   5. If none, undo last move and try again
+        # Repeat until the sum of visited and occupied cells is all cells
+        while len(self.visited) + len(self.occupied) < self.grid_dims[0] * self.grid_dims[1]:
+            self.wall_estimate_cell()  # doing this just reduces confidence, but technically helps if the robot is moved
+            self.visited.add(self.guess_cell())
+            self.print_grid()
+            self.print_probs()
+            if self.cell_open(left) and not self.wall_in_direction('W'):
+                self.move_probably('W')
+                left[0] -= 1
+                up[0] -= 1
+                down[0] -= 1
+                right[0] -= 1
+            elif self.cell_open(up) and not self.wall_in_direction('N'):
+                self.move_probably('N')
+                left[1] -= 1
+                up[1] -= 1
+                down[1] -= 1
+                right[1] -= 1
+            elif self.cell_open(down) and not self.wall_in_direction('S'):
+                self.move_probably('S')
+                left[1] += 1
+                up[1] += 1
+                down[1] += 1
+                right[1] += 1
+            elif self.cell_open(right) and not self.wall_in_direction('E'):
+                self.move_probably('E')
+                left[0] += 1
+                up[0] += 1
+                down[0] += 1
+                right[0] += 1
+            else:
+                last = self.undo_last_cell_move()
+                if last == 'L':
+                    left[0] += 1
+                    up[0] += 1
+                    down[0] += 1
+                    right[0] += 1
+                elif last == 'R':
+                    left[0] -= 1
+                    up[0] -= 1
+                    down[0] -= 1
+                    right[0] -= 1
+                elif last == 'U':
+                    left[1] += 1
+                    up[1] += 1
+                    down[1] += 1
+                    right[1] += 1
+                elif last == 'D':
+                    left[1] -= 1
+                    up[1] -= 1
+                    down[1] -= 1
+                    right[1] -= 1

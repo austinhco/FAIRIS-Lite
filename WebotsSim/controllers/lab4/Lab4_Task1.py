@@ -17,7 +17,7 @@ emoo = Emoo()
 
 # reset robot position
 # Loads the environment from the maze file
-maze_file = 'worlds/mazes/Labs/Lab4/Lab4_Task2_1.xml'
+maze_file = 'worlds/mazes/Labs/Lab4/Lab4_Task2_3.xml'
 emoo.load_environment(maze_file)
 emoo.move_to_start()
 
@@ -65,20 +65,20 @@ emoo.landmarks = [[[1, 1, 0], [-2, 2]],
                   [[1, 0, 0], [2, 2]],
                   [[0, 0, 1], [2, -2]]]
 # Task 2 Map 1
-emoo.cell_walls = [['WN', 'SN', 'SN', 'NE'],
-                   ['SW', 'SN', 'NE', 'WE'],
-                   ['WN', 'SN', 'SE', 'WE'],
-                   ['SW', 'SN', 'SN', 'SE']]
+# emoo.cell_walls = [['WN', 'SN', 'SN', 'NE'],
+#                    ['SW', 'SN', 'NE', 'WE'],
+#                    ['WN', 'SN', 'SE', 'WE'],
+#                    ['SW', 'SN', 'SN', 'SE']]
 # Task 2 Map 2
 # emoo.cell_walls = [['WN', 'SN', 'SN', 'NE'],
 #                    ['SW', 'N', 'NE', 'WE'],
 #                    ['WNE', 'SW', 'SE', 'WE'],
 #                    ['SW', 'SN', 'SN', 'SE']]
 # Task 2 Map 3
-# emoo.cell_walls = [['SNW', 'SN', 'N', 'NE'],
-#                    ['WN', 'NE', 'WE', 'WE'],
-#                    ['WE', 'SW', 'SE', 'WE'],
-#                    ['SW', 'SN', 'SN', 'SE']]
+emoo.cell_walls = [['SNW', 'SN', 'N', 'NE'],
+                   ['WN', 'NE', 'WE', 'WE'],
+                   ['WE', 'SW', 'SE', 'WE'],
+                   ['SW', 'SN', 'SN', 'SE']]
 emoo.cell_walls = numpy.transpose(numpy.array(emoo.cell_walls))
 # Initialize probabilities
 for j in range(emoo.grid_dims[1]):
@@ -87,16 +87,12 @@ for j in range(emoo.grid_dims[1]):
         row.append(0.5)
     emoo.cell_probs.append(row)
 starting_cell = emoo.coord_to_cell(emoo.starting_position.x+2, emoo.starting_position.y-2)
-emoo.assert_probs_position(starting_cell[0], starting_cell[1])
+#emoo.assert_probs_position(starting_cell[0], starting_cell[1])
 
-emoo.move_probably('E')
 while 1:
     # World can be changed on line 18
     # if len(emoo.visited) + len(emoo.occupied) < emoo.grid_dims[0] * emoo.grid_dims[1]:
     #     emoo.trilaterate()
     #     emoo.navigate_grid()
-    emoo.wall_estimate_cell()
-    emoo.print_probs()
-    print(emoo.guess_cell())
-    emoo.move_probably('N')
+    emoo.navigate_wall_probs()
     emoo.advance()
