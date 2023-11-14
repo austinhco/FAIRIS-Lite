@@ -84,8 +84,10 @@ emoo.cell_walls = numpy.transpose(numpy.array(emoo.cell_walls))
 for j in range(emoo.grid_dims[1]):
     row = []
     for i in range(emoo.grid_dims[0]):
-        row.append(1/(emoo.grid_dims[0]*emoo.grid_dims[1]))
+        row.append(0.5)
     emoo.cell_probs.append(row)
+starting_cell = emoo.coord_to_cell(emoo.starting_position.x+2, emoo.starting_position.y-2)
+emoo.assert_probs_position(starting_cell[0], starting_cell[1])
 
 while 1:
     # World can be changed on line 18
@@ -93,4 +95,7 @@ while 1:
     #     emoo.trilaterate()
     #     emoo.navigate_grid()
     emoo.wall_estimate_cell()
+    emoo.print_probs()
+    print(emoo.guess_cell())
+    emoo.move_probably('E')
     emoo.advance()

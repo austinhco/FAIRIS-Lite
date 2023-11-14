@@ -184,6 +184,13 @@ class Emoo(RosBot):
               f"θ: {self.get_compass_reading()}")
         return
 
+    def print_probs(self):
+        copy = self.cell_probs
+        for i in range(self.grid_dims[0]):
+            for j in range(self.grid_dims[1]):
+                copy[i][j] = round(copy[i][j], 2)
+        print(numpy.matrix(numpy.transpose(self.cell_probs)))
+
     # Advance time (unless stop signal)
     def advance(self):
         if self.step(int(self.getBasicTimeStep())) == -1:
@@ -614,6 +621,8 @@ class Emoo(RosBot):
     # Start of Localization Functions
 
     def p_to_logsodd(self, p):
+        if p == 1:
+            return math.inf
         return numpy.log(p / (1 - p))
 
     def logsodd_to_p(self, logsodd):
@@ -816,7 +825,7 @@ class Emoo(RosBot):
                     right[1] -= 1
         self.print_grid()
 
-    # Detect whether or not a wall is present in a given direction
+    # Detect whether a wall is present in a given direction
     def wall_behind(self):
         return self.detect_closest(0, 10) < self.cell_len
 
@@ -833,28 +842,37 @@ class Emoo(RosBot):
     def detect_walls(self):
         self.rotate_to(90)
         walls = ""
-        confidence = 1
+        confidence = self.p_to_logsodd(0.5)
         if self.wall_behind():
             walls += 'S'
-            confidence *= 0.9
+            confidence += 0.9
         else:
-            confidence *= 0.7
+            confidence += 0.7
         if self.wall_left():
             walls += 'W'
-            confidence *= 0.9
+            confidence += 0.9
         else:
-            confidence *= 0.7
+            confidence += 0.7
         if self.wall_front():
             walls += 'N'
-            confidence *= 0.9
+            confidence += 0.9
         else:
-            confidence *= 0.7
+            confidence += 0.7
         if self.wall_right():
             walls += 'E'
-            confidence *= 0.9
+            confidence += 0.9
         else:
-            confidence *= 0.7
-        return [walls, confidence]
+            confidence += 0.7
+        return [walls, self.logsodd_to_p(confidence)]
+
+    # Update cell probability
+    def update_cell_prob(self, x, y, new_prob, force=False):
+        if force:
+            self.cell_probs[x][y] = new_prob
+            return
+        self.cell_probs[x][y] = self.logsodd_to_p(self.p_to_logsodd(self.cell_probs[x][y]) -
+                                                                    self.p_to_logsodd(0.5) +
+                                                                    self.p_to_logsodd(new_prob))
 
     # Assess which cell we are probably in
     def wall_estimate_cell(self):
@@ -863,8 +881,61 @@ class Emoo(RosBot):
         confidence = walls[1]
         # Obtain potential matches
         matches = []
-        for j in range(self.grid_dims[1]):
-            for i in range(self.grid_dims[0]):
+        for i in range(self.grid_dims[0]):
+            for j in range(self.grid_dims[1]):
                 if self.cell_walls[i][j] == dirs:
                     matches.append([i, j])
+        # Update the probabilities for each match
+        for cell in matches:
+            self.update_cell_prob(cell[0], cell[1], confidence)
+        self.normalize_probs()
 
+    # Get most likely cell. If many are tied, take any.
+    def guess_cell(self):
+        index = numpy.argmax(self.cell_probs)
+        x = math.floor(index / self.grid_dims[0])
+        y = index % self.grid_dims[1]
+        return [x, y]
+
+    # Normalize probs to sum to 1
+    def normalize_probs(self):
+        sum = numpy.sum(self.cell_probs)
+        for i in range(self.grid_dims[0]):
+            for j in range(self.grid_dims[1]):
+                self.cell_probs[i][j] /= sum
+
+    # Assert starting position with 100% confidence
+    def assert_probs_position(self, x, y):
+        for i in range(self.grid_dims[0]):
+            for j in range(self.grid_dims[1]):
+                self.cell_probs[i][j] = 0
+        self.cell_probs[x][y] = 1
+
+    # Move one cell length in specified compass direction while applying motion model to cell probs
+    def move_probably(self, dir='N'):
+        current = self.guess_cell()
+        x = current[0]
+        y = current[1]
+        if dir == 'N':
+            self.rotate_to(90)
+            self.update_cell_prob(x, y, 0.2, True)
+            self.update_cell_prob(x, y - 1, 0.8, True)
+        elif dir == 'E':
+            self.rotate_to(0)
+            self.update_cell_prob(x, y, 0.2, True)
+            self.update_cell_prob(x + 1, y, 0.8, True)
+        elif dir == 'S':
+            self.rotate_to(-90)
+            self.update_cell_prob(x, y, 0.2, True)
+            self.update_cell_prob(x, y + 1, 0.8, True)
+        elif dir == 'W':
+            self.rotate_to(180)
+            self.update_cell_prob(x, y, 0.2, True)
+            self.update_cell_prob(x - 1, y, 0.8, True)
+        self.normalize_probs()
+        self.move_linear(self.cell_len)
+
+    # Navigate based on position probabilities and known visited cells
+    def navigate_wall_probs(self):
+
+        return
