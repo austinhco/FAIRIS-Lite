@@ -44,7 +44,7 @@ emoo.wall_following_speed = 10
 emoo.target_angle_width = 10
 
 # Set sensor parameters
-emoo.range_width = 10
+emoo.range_width = 5
 
 # Set PID parameters
 emoo.pid_kp = 1  # k forward
@@ -58,17 +58,18 @@ emoo.estimated_y = 0
 emoo.target_size = [1.5, 0.5]  # [Height, Diameter]
 
 # Localization info NOTE: Cells are organized such that UP/NORTH is NEGATIVE
-emoo.grid_dims = [4, 4]
-emoo.cell_len = 1
-emoo.landmarks = [[[1, 1, 0], [-2, 2]],
-                  [[0, 1, 0], [-2, -2]],
-                  [[1, 0, 0], [2, 2]],
-                  [[0, 0, 1], [2, -2]]]
+emoo.grid_dims = [42, 42]
+emoo.cell_len = 0.2
+emoo.true_map_dims = [20, 20]
+# emoo.landmarks = [[[1, 1, 0], [-2, 2]],
+#                   [[0, 1, 0], [-2, -2]],
+#                   [[1, 0, 0], [2, 2]],
+#                   [[0, 0, 1], [2, -2]]]
 # Task 2 Map 1
-emoo.cell_walls = [['WN', 'SN', 'SN', 'NE'],
-                   ['SW', 'SN', 'NE', 'WE'],
-                   ['WN', 'SN', 'SE', 'WE'],
-                   ['SW', 'SN', 'SN', 'SE']]
+# emoo.cell_walls = [['WN', 'SN', 'SN', 'NE'],
+#                    ['SW', 'SN', 'NE', 'WE'],
+#                    ['WN', 'SN', 'SE', 'WE'],
+#                    ['SW', 'SN', 'SN', 'SE']]
 # Task 2 Map 2
 # emoo.cell_walls = [['WN', 'SN', 'SN', 'NE'],
 #                    ['SW', 'N', 'NE', 'WE'],
@@ -80,23 +81,24 @@ emoo.cell_walls = [['WN', 'SN', 'SN', 'NE'],
 #                    ['WE', 'SW', 'SE', 'WE'],
 #                    ['SW', 'SN', 'SN', 'SE']]
 emoo.cell_walls = numpy.transpose(numpy.array(emoo.cell_walls))
-# Initialize probabilities
+# Initialize positional probabilities
 for j in range(emoo.grid_dims[1]):
-    row = []
+    position_row = []
+    occupancy_row = []
     for i in range(emoo.grid_dims[0]):
-        row.append(0.5)
-    emoo.cell_probs.append(row)
-starting_cell = emoo.coord_to_cell(emoo.starting_position.x+2, emoo.starting_position.y-2)
-emoo.assert_probs_position(starting_cell[0], starting_cell[1])
+        position_row.append(0.5)
+        occupancy_row.append(0.5)
+    emoo.cell_probs.append(position_row)
+    emoo.occupancy_matrix.append(occupancy_row)
+# starting_cell = emoo.coord_to_cell(emoo.starting_position.x+2, emoo.starting_position.y-2)
+# emoo.assert_probs_position(starting_cell[0], starting_cell[1])
 
+emoo.advance()
 while 1:
     # World can be changed on line 18
-    # Trilateration code
-    # if len(emoo.visited) + len(emoo.occupied) < emoo.grid_dims[0] * emoo.grid_dims[1]:
-    #     emoo.trilaterate()
-    #     emoo.navigate_grid()
-    # Wall navigation code
-    # Wall map can be changed by commenting / uncommenting blocks on lines 68-71, 73-76, and 78-81
-    emoo.navigate_wall_probs()
+    emoo.measure_occupancy_radial()
+    emoo.print_grid()
+    if emoo.can_go_up():
+        emoo.move_cells_up(5)
     # Advance time
     emoo.advance()

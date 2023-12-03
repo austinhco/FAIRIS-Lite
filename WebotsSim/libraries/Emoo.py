@@ -71,6 +71,7 @@ class Emoo(RosBot):
 
     # Map and landmark information
     grid_dims = [1, 1]  # Size of grid in cells
+    true_map_dims = [1, 1]  # Size of true map (not internal grid) in cells
     cell_len = 1  # Size of cell in m (cells = cell_len x cell_len squares)
     landmarks = []  # Landmarks: List of landmarks as [[r,g,b], [x, y]]
     cell_walls = []  # Wall characteristics for all walls
@@ -78,6 +79,7 @@ class Emoo(RosBot):
     visited = set([])  # list of visited cells
     occupied = set([])  # list of obstacle cells
     previous_moves = []  # list of prior cell movements
+    occupancy_matrix = []  # occupancy matrix for full grid
 
     # Override stop function to add state update
     def stop(self):
@@ -154,15 +156,27 @@ class Emoo(RosBot):
     def print_grid(self):
         grid = [[' . ' for i in range(self.grid_dims[0])] for j in range(self.grid_dims[1])]
         for cell in self.visited:
-            grid[cell[0]+math.floor(self.grid_dims[0]/2)][cell[1]+math.floor(self.grid_dims[1]/2)] = ' X '
+            grid[cell[0] + math.floor(self.grid_dims[0] / 2)][cell[1] + math.floor(self.grid_dims[1] / 2)] = ' X '
+        # Mark force occupied cells
         for cell in self.occupied:
-            grid[cell[0]+math.floor(self.grid_dims[0]/2)][cell[1]+math.floor(self.grid_dims[1]/2)] = ' O '
+            grid[cell[0] + math.floor(self.grid_dims[0] / 2)][cell[1] + math.floor(self.grid_dims[1] / 2)] = ' O '
+        # Mark detected occupied cells
+        for j in range(self.grid_dims[1]):
+            for i in range(self.grid_dims[0]):
+                occpuancy_x = i - math.floor(self.grid_dims[0] / 2)
+                occupancy_y = j - math.floor(self.grid_dims[1] / 2)
+                if self.guess_occupied(occpuancy_x, occupancy_y):
+                    grid[i][j] = ' O '
+                elif self.guess_empty(occpuancy_x, occupancy_y):
+                    grid[i][j] = '   '
+                else:
+                    grid[i][j] = ' . '
         bot_cell = self.coord_to_cell(self.estimated_x, self.estimated_y)
         grid[bot_cell[0] + math.floor(self.grid_dims[0] / 2)][bot_cell[1] + math.floor(self.grid_dims[1] / 2)] = ' ▪ '
-        for j in range(-1, self.grid_dims[1]+1):
+        for j in range(-1, self.grid_dims[1] + 1):
             # Print full line
             row = []
-            for i in range(-1, self.grid_dims[0]+1):
+            for i in range(-1, self.grid_dims[0] + 1):
                 if j == -1 or j == self.grid_dims[1]:
                     if i == -1 or i == self.grid_dims[0]:
                         row.append(' + ')
@@ -177,9 +191,10 @@ class Emoo(RosBot):
             print(''.join(row))
         # Also print estimated coordinates and cell
         print(f"Cell: X: {bot_cell[0]}, Y: {bot_cell[1]}, Confidence: "
-              f"{self.cell_probs[bot_cell[0]+math.floor(self.grid_dims[0]/2)][bot_cell[1]+math.floor(self.grid_dims[1]/2)]}\n"
+              f"{self.cell_probs[bot_cell[0] + math.floor(self.grid_dims[0] / 2)][bot_cell[1] + math.floor(self.grid_dims[1] / 2)]}\n"
               f"Exact Coordinates: X: {self.estimated_x:.2f}, Y: {self.estimated_y:.2f}, "
-              f"θ: {self.get_compass_reading()}")
+              f"θ: {self.get_compass_reading()}\n"
+              f"Map Completion: {self.known_ratio() * 100:.0f}%")
         return
 
     def print_probs(self):
@@ -218,6 +233,7 @@ class Emoo(RosBot):
         self.set_left_motors_velocity(self.speed_pref)
         self.move_until(current_ae, distance)
         self.stop()
+        self.measure_occupancy_radial()
 
     # Move in an arc a given distance (m) with a certain radius (m) - clock direction
     # will be determined by sign of radius:
@@ -331,6 +347,9 @@ class Emoo(RosBot):
 
     def get_forward_distance(self):
         return self.detect_closest(180, self.range_width)
+
+    def get_rear_distance(self):
+        return self.detect_closest(0, self.range_width)
 
     # Detect left wall distance
     def get_left_wall_distance(self):
@@ -489,7 +508,8 @@ class Emoo(RosBot):
         else:
             if self.get_forward_distance() <= distance + self.linear_precision_pref or self.right_far(distance):
                 # If left and right walls appear very far, rotate 90deg left and align with forward wall
-                if self.left_very_far(distance) and self.right_very_far(distance) and self.get_forward_distance() < distance * 5:
+                if self.left_very_far(distance) and self.right_very_far(
+                        distance) and self.get_forward_distance() < distance * 5:
                     err_for = self.get_forward_distance() - distance
                     if math.fabs(err_for) <= self.linear_precision_pref * 10:
                         self.rotate(-90)
@@ -628,7 +648,7 @@ class Emoo(RosBot):
 
     # Convert the input x and y coordinates to a cell coordinate on the map grid, bearing in mind:
     # 1 cell is defined by self.cell_len
-    # The center of the grid is defined at 0,0 (intersection between cells at [1,1],[-1,1],[-1,-1],[-1,-1]
+    # The center of the grid is defined at 0,0 (intersection between cells at [0,0],[-1,0],[-1,-1],[0,-1]
     # Up = Negative
     # Right = Positive
     def coord_to_cell(self, x, y):
@@ -710,6 +730,28 @@ class Emoo(RosBot):
         elif relative_cardinal == 'E':
             return self.wall_front()
 
+    # Get distance to wall in given direction
+    def wall_distance_in_direction(self, dir='N'):
+        self.snap_cardinal()
+        current = self.get_compass_reading()
+        dir_angle = self.degrees_from_cardinal(dir)
+        dif = dir_angle - current
+        while dif > 360:
+            dif -= 360
+        while dif < 0:
+            dif += 360
+        # now dif represents the angle from the robot that we are trying to check
+        # relative_cardinal is the direction from the robot, where N is right
+        relative_cardinal = self.cardinal_from_degrees(dif)
+        if relative_cardinal == 'S':
+            return self.get_right_wall_distance()
+        elif relative_cardinal == 'W':
+            return self.get_rear_distance()
+        elif relative_cardinal == 'N':
+            return self.get_left_wall_distance()
+        elif relative_cardinal == 'E':
+            return self.get_forward_distance()
+
     # Get angles and colors of all visible landmarks
     def find_landmarks(self):
         # Orient north, then rotate fully, remembering landmark distances
@@ -737,7 +779,7 @@ class Emoo(RosBot):
                             already = 1
                     if not already:
                         landmarks.append(new_landmark)
-            self.rotate_to(90+i)
+            self.rotate_to(90 + i)
         # Re-orient north since we may be slightly off
         self.rotate_to(90)
         return landmarks
@@ -760,16 +802,20 @@ class Emoo(RosBot):
         # ABCDEF according to Trilateration algorithm described in slide
         A = (-2 * C1[0]) + (2 * C2[0])
         B = (-2 * C1[1]) + (2 * C2[1])
-        C = math.pow(C1[2], 2) - math.pow(C2[2], 2) - math.pow(C1[0], 2) + math.pow(C2[0], 2) - math.pow(C1[1], 2) + math.pow(C2[1], 2)
+        C = math.pow(C1[2], 2) - math.pow(C2[2], 2) - math.pow(C1[0], 2) + math.pow(C2[0], 2) - math.pow(C1[1],
+                                                                                                         2) + math.pow(
+            C2[1], 2)
         D = (-2 * C2[0]) + (2 * C3[0])
         E = (-2 * C2[1]) + (2 * C3[1])
-        F = math.pow(C2[2], 2) - math.pow(C3[2], 2) - math.pow(C2[0], 2) + math.pow(C3[0], 2) - math.pow(C2[1], 2) + math.pow(C3[1], 2)
+        F = math.pow(C2[2], 2) - math.pow(C3[2], 2) - math.pow(C2[0], 2) + math.pow(C3[0], 2) - math.pow(C2[1],
+                                                                                                         2) + math.pow(
+            C3[1], 2)
         # Exception as stated in slide:
         if E * A == B * D:
             return []
         # Final calculation
-        x = ((C*E) - (F*B)) / ((E*A) - (B*D))
-        y = ((C*D) - (A*F)) / ((B*D) - (A*E))
+        x = ((C * E) - (F * B)) / ((E * A) - (B * D))
+        y = ((C * D) - (A * F)) / ((B * D) - (A * E))
         self.estimated_x = x
         self.estimated_y = y
         return tuple([x, y])
@@ -780,24 +826,42 @@ class Emoo(RosBot):
         self.move_linear(self.cell_len)
         self.previous_moves.append('L')
 
+    def move_cells_left(self, n):
+        for i in range(n):
+            self.move_cell_left()
+
     def move_cell_right(self):
         self.rotate_to(0)
         self.move_linear(self.cell_len)
         self.previous_moves.append('R')
+
+    def move_cells_right(self, n):
+        for i in range(n):
+            self.move_cell_right()
 
     def move_cell_up(self):
         self.rotate_to(90)
         self.move_linear(self.cell_len)
         self.previous_moves.append('U')
 
+    def move_cells_up(self, n):
+        for i in range(n):
+            self.move_cell_up()
+
     def move_cell_down(self):
         self.rotate_to(270)
         self.move_linear(self.cell_len)
         self.previous_moves.append('D')
 
+    def move_cells_down(self, n):
+        for i in range(n):
+            self.move_cell_down()
+
     # Undo last known cell movement and return what it was
     def undo_last_cell_move(self):
-        last = self.previous_moves[len(self.previous_moves)-1]
+        if len(self.previous_moves) < 1:
+            return
+        last = self.previous_moves[len(self.previous_moves) - 1]
         self.previous_moves.pop()
         if last == 'L':
             self.move_cell_right()
@@ -810,13 +874,41 @@ class Emoo(RosBot):
         self.previous_moves.pop()
         return last
 
+    # Undo, maybe
+    def undo_last_cell_move_probably(self):
+        if len(self.previous_moves) < 1:
+            return 'X'
+        cell = self.coord_to_cell(self.estimated_x, self.estimated_y)
+        x = cell[0]
+        y = cell[1]
+        last = self.previous_moves[len(self.previous_moves) - 1]
+        self.previous_moves.pop()
+        if last == 'D':
+            self.move_cell_up()
+            self.update_cell_prob(x, y, 0.2, True)
+            self.update_cell_prob(x, y - 1, 0.8, True)
+        elif last == 'L':
+            self.move_cell_right()
+            self.update_cell_prob(x, y, 0.2, True)
+            self.update_cell_prob(x + 1, y, 0.8, True)
+        elif last == 'U':
+            self.move_cell_down()
+            self.update_cell_prob(x, y, 0.2, True)
+            self.update_cell_prob(x, y + 1, 0.8, True)
+        elif last == 'R':
+            self.move_cell_left()
+            self.update_cell_prob(x, y, 0.2, True)
+            self.update_cell_prob(x - 1, y, 0.8, True)
+        self.previous_moves.pop()
+        return last
+
     # Calculate a path through every grid cell while avoiding pre-visited or occupied cells
     def navigate_grid(self):
         start = self.coord_to_cell(self.estimated_x, self.estimated_y)
-        left = [start[0]-1, start[1]]
-        up = [start[0], start[1]-1]
-        down = [start[0], start[1]+1]
-        right = [start[0]+1, start[1]]
+        left = [start[0] - 1, start[1]]
+        up = [start[0], start[1] - 1]
+        down = [start[0], start[1] + 1]
+        right = [start[0] + 1, start[1]]
         # It goes like this:
         # Routine: Avoid all obstacles AND visited spaces
         #   1. Left?
@@ -922,8 +1014,16 @@ class Emoo(RosBot):
             self.cell_probs[x][y] = new_prob
             return
         self.cell_probs[x][y] = self.logsodd_to_p(self.p_to_logsodd(self.cell_probs[x][y]) -
-                                                                    self.p_to_logsodd(0.5) +
-                                                                    self.p_to_logsodd(new_prob))
+                                                  self.p_to_logsodd(0.5) +
+                                                  self.p_to_logsodd(new_prob))
+
+    def update_occupancy_prob(self, x, y, new_prob, force=False):
+        if force:
+            self.occupancy_matrix[x][y] = new_prob
+            return
+        self.occupancy_matrix[x][y] = self.logsodd_to_p(self.p_to_logsodd(self.occupancy_matrix[x][y]) -
+                                                        self.p_to_logsodd(0.5) +
+                                                        self.p_to_logsodd(new_prob))
 
     # Assess which cell we are probably in
     def wall_estimate_cell(self):
@@ -951,12 +1051,27 @@ class Emoo(RosBot):
         self.estimated_y = -y * self.cell_len
         return tuple([x, y])
 
+    # Guess if cell is occupied based on occupancy matrix
+    def guess_occupied(self, cell_x, cell_y):
+        return self.occupancy_matrix[cell_x][cell_y] > 0.5
+
+    # Guess if cell is empty based on occpancy matrix
+    def guess_empty(self, cell_x, cell_y):
+        return self.occupancy_matrix[cell_x][cell_y] < 0.5
+
     # Normalize probs to sum to 1
     def normalize_probs(self):
         sum = numpy.sum(self.cell_probs)
         for i in range(self.grid_dims[0]):
             for j in range(self.grid_dims[1]):
                 self.cell_probs[i][j] /= sum
+
+    # Normalize occupancy probs to sum to 1
+    def normalize_occpuancy_probs(self):
+        sum = numpy.sum(self.occupancy_matrix)
+        for i in range(self.grid_dims[0]):
+            for j in range(self.grid_dims[1]):
+                self.occupancy_matrix[i][j] /= sum
 
     # Assert starting position with 100% confidence
     def assert_probs_position(self, x, y):
@@ -1040,8 +1155,10 @@ class Emoo(RosBot):
                 down[0] += 1
                 right[0] += 1
             else:
-                last = self.undo_last_cell_move()
-                if last == 'L':
+                last = self.undo_last_cell_move_probably()
+                if last == 'X':
+                    break
+                elif last == 'L':
                     left[0] += 1
                     up[0] += 1
                     down[0] += 1
@@ -1061,3 +1178,201 @@ class Emoo(RosBot):
                     up[1] -= 1
                     down[1] -= 1
                     right[1] -= 1
+
+    # Determine occupancy for visible cells
+    def measure_occupancy(self):
+        self.snap_cardinal()
+        dist_n = self.wall_distance_in_direction('N')
+        cell_n = self.coord_to_cell(self.estimated_x, self.estimated_y + dist_n)
+        dist_e = self.wall_distance_in_direction('E')
+        cell_e = self.coord_to_cell(self.estimated_x + dist_e, self.estimated_y)
+        dist_s = self.wall_distance_in_direction('S')
+        cell_s = self.coord_to_cell(self.estimated_x, self.estimated_y - dist_s)
+        dist_w = self.wall_distance_in_direction('W')
+        cell_w = self.coord_to_cell(self.estimated_x - dist_w, self.estimated_y)
+        current_cell = self.coord_to_cell(self.estimated_x, self.estimated_y)
+        # We will assume the cell we are in is not obstacle'd
+        print(current_cell)
+        self.update_occupancy_prob(current_cell[0], current_cell[1], 0.3)
+        # Update probabilities for directions
+        print(cell_n)
+        print(cell_e)
+        print(cell_s)
+        print(cell_w)
+        self.update_occupancy_prob(cell_n[0], cell_n[1], 0.6)
+        self.update_occupancy_prob(cell_e[0], cell_e[1], 0.6)
+        self.update_occupancy_prob(cell_s[0], cell_s[1], 0.6)
+        self.update_occupancy_prob(cell_w[0], cell_w[1], 0.6)
+        n_cells = int(math.fabs(current_cell[1] - cell_n[1]))
+        for i in range(1, n_cells - 1):
+            self.update_occupancy_prob(current_cell[0], current_cell[1] - i, 0.3)
+        e_cells = int(cell_e[0] - current_cell[0])
+        for i in range(1, e_cells - 1):
+            self.update_occupancy_prob(current_cell[0] + i, current_cell[1], 0.3)
+        s_cells = int(current_cell[1] - cell_s[1])
+        for i in range(1, s_cells - 1):
+            self.update_occupancy_prob(current_cell[0], current_cell[1] + i, 0.3)
+        w_cells = int(cell_w[0] - current_cell[0])
+        for i in range(1, w_cells - 1):
+            self.update_occupancy_prob(current_cell[0] - i, current_cell[1], 0.3)
+
+    def measure_occupancy_radial(self):
+        obstacles = set()
+        empties = set()
+        # Process all LIDAR angles to obtain cells with detectable obstacles
+        for i in range(360):
+            true_angle = i + 180 + self.get_compass_reading()
+            while true_angle > 360:
+                true_angle -= 360
+            dist = self.detect_closest(i, 1)
+            rel_x = dist * math.cos(true_angle * (math.pi/180))
+            rel_y = dist * math.sin(true_angle * (math.pi/180))
+            # Adjust rel x and rel y for current heading
+            if self.get_cardinal() == 'E' or self.get_cardinal() == 'W':
+                rel_x *= -1
+                rel_y *= -1
+            true_x = self.estimated_x - rel_x
+            true_y = self.estimated_y + rel_y
+            obstacle_cell = self.coord_to_cell(true_x, true_y)
+            obstacles.add(obstacle_cell)
+            # Obtain empty cells based on detected obstacle cells (all cells along path must be empty)
+            # Do this by checking points every cell_len along the line between bot and obstacle
+            # Only complete this step if cells exist between bot and obstacle
+            if math.fabs(rel_x) < self.cell_len or math.fabs(rel_y) < self.cell_len:
+                continue
+            steps = math.floor(dist / self.cell_len)
+            for j in range(steps):
+                empty_x = self.estimated_x - (rel_x * (j/steps))
+                empty_y = self.estimated_y + (rel_y * (j/steps))
+                empty_cell = self.coord_to_cell(empty_x, empty_y)
+                empties.add(empty_cell)
+        # Set probabilities for obstacles and empties based on prescribed model
+        for cell in obstacles:
+            self.update_occupancy_prob(cell[0], cell[1], 0.6)
+        for cell in empties:
+            self.update_occupancy_prob(cell[0], cell[1], 0.3)
+
+    # Obtain the percentage of known cells
+    def known_ratio(self):
+        total = self.true_map_dims[0] * self.true_map_dims[1]
+        known = 0
+        for cell in self.occupancy_matrix:
+            if cell != 0.5:
+                known += 1
+        return known / total
+
+    # Check if a cell (and all cells before it) are unvisited and unoccupied
+    def can_go_left(self):
+        inc = math.floor(1 / self.cell_len)
+        current_cell = self.coord_to_cell(self.estimated_x, self.estimated_y)
+        for i in range(1, inc + 1):
+            cell = [current_cell[0] - i, current_cell[1]]
+            if self.guess_occupied(cell[0], cell[1]) or self.cell_visited(cell):
+                return False
+        return True
+
+    def can_go_right(self):
+        inc = math.floor(1 / self.cell_len)
+        current_cell = self.coord_to_cell(self.estimated_x, self.estimated_y)
+        for i in range(1, inc + 1):
+            cell = [current_cell[0] + i, current_cell[1]]
+            if self.guess_occupied(cell[0], cell[1]) or self.cell_visited(cell):
+                return False
+        return True
+
+    def can_go_up(self):
+        inc = math.floor(1 / self.cell_len)
+        current_cell = self.coord_to_cell(self.estimated_x, self.estimated_y)
+        for i in range(1, inc + 1):
+            cell = [current_cell[0], current_cell[1] - i]
+            if self.guess_occupied(cell[0], cell[1]) or self.cell_visited(cell):
+                return False
+        return True
+
+    def can_go_down(self):
+        inc = math.floor(1 / self.cell_len)
+        current_cell = self.coord_to_cell(self.estimated_x, self.estimated_y)
+        for i in range(1, inc + 1):
+            cell = [current_cell[0], current_cell[1] + i]
+            if self.guess_occupied(cell[0], cell[1]) or self.cell_visited(cell):
+                return False
+        return True
+
+
+    # This will implement navigate_grid for a subcell grid using occupancy grids
+    def navigate_occupancy(self):
+        inc = math.floor(1 / self.cell_len)
+        start = self.coord_to_cell(self.estimated_x, self.estimated_y)
+        left = [start[0] - inc, start[1]]
+        up = [start[0], start[1] - inc]
+        down = [start[0], start[1] + inc]
+        right = [start[0] + inc, start[1]]
+        # Continue until the true map is known to at least 90%
+        while self.known_ratio() < 0.9:
+            cell = self.coord_to_cell(self.estimated_x, self.estimated_y)
+            self.visited.add(cell)
+            # Same thing as before, but move in increments of inc
+
+        # start = self.coord_to_cell(self.estimated_x, self.estimated_y)
+        # left = [start[0] - 1, start[1]]
+        # up = [start[0], start[1] - 1]
+        # down = [start[0], start[1] + 1]
+        # right = [start[0] + 1, start[1]]
+        # # It goes like this:
+        # # Routine: Avoid all obstacles AND visited spaces
+        # #   1. Left?
+        # #   2. Up?
+        # #   3. Down?
+        # #   4. Right?
+        # #   5. If none, undo last move and try again
+        # # Repeat until the sum of visited and occupied cells is all cells
+        # while len(self.visited) + len(self.occupied) < self.grid_dims[0] * self.grid_dims[1]:
+        #     cell = self.coord_to_cell(self.estimated_x, self.estimated_y)
+        #     self.visited.add(cell)
+        #     self.print_grid()
+        #     if self.cell_open(left):
+        #         self.move_cell_left()
+        #         left[0] -= 1
+        #         up[0] -= 1
+        #         down[0] -= 1
+        #         right[0] -= 1
+        #     elif self.cell_open(up):
+        #         self.move_cell_up()
+        #         left[1] -= 1
+        #         up[1] -= 1
+        #         down[1] -= 1
+        #         right[1] -= 1
+        #     elif self.cell_open(down):
+        #         self.move_cell_down()
+        #         left[1] += 1
+        #         up[1] += 1
+        #         down[1] += 1
+        #         right[1] += 1
+        #     elif self.cell_open(right):
+        #         self.move_cell_right()
+        #         left[0] += 1
+        #         up[0] += 1
+        #         down[0] += 1
+        #         right[0] += 1
+        #     else:
+        #         last = self.undo_last_cell_move()
+        #         if last == 'L':
+        #             left[0] += 1
+        #             up[0] += 1
+        #             down[0] += 1
+        #             right[0] += 1
+        #         elif last == 'R':
+        #             left[0] -= 1
+        #             up[0] -= 1
+        #             down[0] -= 1
+        #             right[0] -= 1
+        #         elif last == 'U':
+        #             left[1] += 1
+        #             up[1] += 1
+        #             down[1] += 1
+        #             right[1] += 1
+        #         elif last == 'D':
+        #             left[1] -= 1
+        #             up[1] -= 1
+        #             down[1] -= 1
+        #             right[1] -= 1
