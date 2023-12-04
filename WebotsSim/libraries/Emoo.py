@@ -1449,9 +1449,12 @@ class Emoo(RosBot):
 
     # Import occupancy matrix. Should be used to import finished maps.
     def import_map(self, path, map_hash):
-        with open(f"{path}/map_{map_hash}.pkl", "rb") as inp:
-            self.occupancy_matrix = pickle.load(inp)
-        self.grid_dims = self.true_map_dims
+        if os.path.exists(f"{path}/map_{map_hash}.pkl",):
+            with open(f"{path}/map_{map_hash}.pkl", "rb") as inp:
+                self.occupancy_matrix = pickle.load(inp)
+            self.grid_dims = self.true_map_dims
+        else:
+            print(f"Could not locate file {path}/map_{map_hash}.pkl.")
 
     # Set coords to starting coords
     def set_start_coords(self):
