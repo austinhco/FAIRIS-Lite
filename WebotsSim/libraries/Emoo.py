@@ -1268,7 +1268,7 @@ class Emoo(RosBot):
                 self.measure_occupancy_radial(n - 1)
         else:
             # If give_results is set, return obstacles and empties instead
-            return tuple[obstacles, empties]
+            return [obstacles, empties]
 
     # Obtain the percentage of known cells
     def known_ratio(self):
@@ -1463,5 +1463,39 @@ class Emoo(RosBot):
 
     # Attempt to match current readings to cell on known map
     def occupancy_guess_pos(self):
-        self.measure_occupancy_radial(1, True)
+        results = self.measure_occupancy_radial(1, True)
+        obstacles = list(results[0])
+        empties = list(results[1])
+        both = numpy.array(obstacles + empties)
+        # Make a mini-matrix with this information
+        # Obtain corners
+        max_idx = numpy.argmax(both, axis=0)
+        min_idx = numpy.argmin(both, axis=0)
+        max_x_corner, max_y_corner = both[max_idx]
+        min_x_corner, min_y_corner = both[min_idx]
+        max_x = max_x_corner[0]
+        min_x = min_x_corner[0]
+        max_y = max_y_corner[1]
+        min_y = min_y_corner[1]
+        x_dim = max_x - min_x + 1
+        y_dim = max_y - min_y + 1
+        matrix = []
+        for j in range(x_dim):
+            row = []
+            for i in range(y_dim):
+                row.append(0.5)
+            matrix.append(row)
+        # Now add info
+        for cell in obstacles:
+            matrix[cell[0]][cell[1]] = 1
+        for cell in empties:
+            matrix[cell[0]][cell[1]] = 0
+        readable_matrix = list(zip(*matrix[::-1]))
+        readable_matrix = numpy.roll(readable_matrix, (-min_y, min_x), axis=(0, 1)).round()
+        readable_matrix = numpy.flip(readable_matrix, axis=1)
+        readable_occupancy = numpy.transpose(numpy.roll(self.occupancy_matrix.round(),
+                                                        (-math.floor(self.grid_dims[0] / 2) - 1,
+                                                        -math.floor(self.grid_dims[1] / 2) - 1), (0, 1)))
+        # By comparing readable_matrix and readable_occupancy, we can identify the best match
+        # where readable_matrix is a submatrix or readable_occupancy
 
