@@ -95,10 +95,16 @@ for j in range(emoo.grid_dims[1]):
 # emoo.assert_probs_position(starting_cell[0], starting_cell[1])
 
 emoo.advance()
+emoo.advance()
+emoo.advance()
 # World can be changed on line 18
-emoo.navigate_occupancy()
-emoo.print_grid()
-emoo.compress_occupancy_matrix()
+# emoo.navigate_occupancy()
+# emoo.print_grid()
+# emoo.compress_occupancy_matrix()
+# emoo.print_grid()
+# emoo.export_map("maps")
+emoo.import_map("maps", "-8728955412489353967")
+emoo.set_start_coords()
 emoo.print_grid()
 # Advance time
 emoo.advance()

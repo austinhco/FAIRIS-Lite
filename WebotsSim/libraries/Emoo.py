@@ -1,10 +1,12 @@
 # WebotsSim/libraries/Emoo.py
 
 import math
+import os
 import statistics
 import sys
 
 import numpy
+import pickle
 
 from WebotsSim.libraries.RobotLib.RosBot import RosBot
 
@@ -827,6 +829,7 @@ class Emoo(RosBot):
         self.move_linear(self.cell_len)
         self.visited.add(self.coord_to_cell(self.estimated_x, self.estimated_y))
         self.previous_moves.append('L')
+        self.print_grid()
 
     def move_cells_left(self, n):
         for i in range(n):
@@ -837,6 +840,7 @@ class Emoo(RosBot):
         self.move_linear(self.cell_len)
         self.visited.add(self.coord_to_cell(self.estimated_x, self.estimated_y))
         self.previous_moves.append('R')
+        self.print_grid()
 
     def move_cells_right(self, n):
         for i in range(n):
@@ -847,6 +851,7 @@ class Emoo(RosBot):
         self.move_linear(self.cell_len)
         self.visited.add(self.coord_to_cell(self.estimated_x, self.estimated_y))
         self.previous_moves.append('U')
+        self.print_grid()
 
     def move_cells_up(self, n):
         for i in range(n):
@@ -857,6 +862,7 @@ class Emoo(RosBot):
         self.move_linear(self.cell_len)
         self.visited.add(self.coord_to_cell(self.estimated_x, self.estimated_y))
         self.previous_moves.append('D')
+        self.print_grid()
 
     def move_cells_down(self, n):
         for i in range(n):
@@ -1221,7 +1227,7 @@ class Emoo(RosBot):
         for i in range(1, w_cells - 1):
             self.update_occupancy_prob(current_cell[0] - i, current_cell[1], 0.3)
 
-    def measure_occupancy_radial(self, n):
+    def measure_occupancy_radial(self, n, give_results=False):
         obstacles = set()
         empties = set()
         # Process all LIDAR angles to obtain cells with detectable obstacles
@@ -1252,13 +1258,17 @@ class Emoo(RosBot):
                 empty_cell = self.coord_to_cell(empty_x, empty_y)
                 empties.add(empty_cell)
         # Set probabilities for obstacles and empties based on prescribed model
-        for cell in obstacles:
-            self.update_occupancy_prob(cell[0], cell[1], 0.6)
-        for cell in empties:
-            self.update_occupancy_prob(cell[0], cell[1], 0.4)
-        # Repeat n times
-        if n > 0:
-            self.measure_occupancy_radial(n - 1)
+        if not give_results:
+            for cell in obstacles:
+                self.update_occupancy_prob(cell[0], cell[1], 0.6)
+            for cell in empties:
+                self.update_occupancy_prob(cell[0], cell[1], 0.4)
+            # Repeat n times
+            if n > 0:
+                self.measure_occupancy_radial(n - 1)
+        else:
+            # If give_results is set, return obstacles and empties instead
+            return tuple[obstacles, empties]
 
     # Obtain the percentage of known cells
     def known_ratio(self):
@@ -1417,19 +1427,38 @@ class Emoo(RosBot):
         self.occupancy_matrix = numpy.compress(mask_x, self.occupancy_matrix, axis=0)
         self.occupancy_matrix = numpy.compress(mask_y, self.occupancy_matrix, axis=1)
         # Roll matrix over to correct for negative index offset
-        print(top_row)
-        print(bottom_row)
-        print(left_column)
-        print(right_column)
         self.occupancy_matrix = numpy.roll(self.occupancy_matrix,
                                            (-top_row - math.floor(new_dims_x / 2),
                                             -left_column - math.floor(new_dims_y / 2)),
                                            axis=(0, 1))
-        numpy.set_printoptions(threshold=numpy.inf)
-        print(numpy.matrix(self.occupancy_matrix).round())
         self.grid_dims[0] = new_dims_x
         self.grid_dims[1] = new_dims_y
+        # Reset visited cells
+        self.visited.clear()
         # Reset own position
         self.estimated_x = 0
         self.estimated_y = 0
-        self.visited.clear()
+
+    # Export occupancy matrix. Should be used to export finished maps.
+    def export_map(self, path):
+        if not os.path.exists(path):
+            os.mkdir(path)
+        map_hash = hash(str(self.occupancy_matrix))
+        with open(f"{path}/map_{map_hash}.pkl", "wb") as out:
+            pickle.dump(self.occupancy_matrix, out, pickle.HIGHEST_PROTOCOL)
+
+    # Import occupancy matrix. Should be used to import finished maps.
+    def import_map(self, path, map_hash):
+        with open(f"{path}/map_{map_hash}.pkl", "rb") as inp:
+            self.occupancy_matrix = pickle.load(inp)
+        self.grid_dims = self.true_map_dims
+
+    # Set coords to starting coords
+    def set_start_coords(self):
+        self.estimated_x = self.starting_position.x
+        self.estimated_y = self.starting_position.y
+
+    # Attempt to match current readings to cell on known map
+    def occupancy_guess_pos(self):
+        self.measure_occupancy_radial(1, True)
+
