@@ -1315,10 +1315,9 @@ class Emoo(RosBot):
         up = [start[0], start[1] - inc]
         down = [start[0], start[1] + inc]
         right = [start[0] + inc, start[1]]
-        # Continue until the true map is known to at least 90%
-        while self.known_ratio() < 0.99:
+        # Continue until the true map is known to at least 99.9%
+        while self.known_ratio() < 0.999:
             self.measure_occupancy_radial(self.measure_steps)
-            self.print_grid()
             cell = self.coord_to_cell(self.estimated_x, self.estimated_y)
             self.visited.add(cell)
             # Same thing as before, but move in increments of inc
@@ -1369,3 +1368,68 @@ class Emoo(RosBot):
                         up[1] -= 1
                         down[1] -= 1
                         right[1] -= 1
+
+    # Assuming the map is finished, use the known corners to compress the occupancy matrix to true map size
+    def compress_occupancy_matrix(self):
+        # Find most negative row with data (top wall)
+        top_row = 0
+        for i in range(0, -self.grid_dims[0]+2, -1):
+            if sum(self.occupancy_matrix[i]) != 0.5 * self.grid_dims[0]:
+                if sum(self.occupancy_matrix[i-1]) == 0.5 * self.grid_dims[0]:
+                    top_row = i
+                    break
+        # Now column (most negative -> left wall)
+        left_column = 0
+        for i in range(0, -self.grid_dims[1], -1):
+            if self.occupancy_matrix[top_row][i] != 0.5:
+                if self.occupancy_matrix[top_row][i-1] == 0.5:
+                    left_column = i
+                    break
+        # Now bottom wall
+        bottom_row = 0
+        for i in range(self.grid_dims[0]-2):
+            if sum(self.occupancy_matrix[i]) != 0.5 * self.grid_dims[0]:
+                if sum(self.occupancy_matrix[i+1]) == 0.5 * self.grid_dims[0]:
+                    bottom_row = i
+                    break
+        # And right wall
+        right_column = 0
+        for i in range(self.grid_dims[1]-2):
+            if self.occupancy_matrix[bottom_row][i] != 0.5:
+                if self.occupancy_matrix[bottom_row][i+1] == 0.5:
+                    right_column = i
+                    break
+        # Now form a submatrix
+        new_dims_x = bottom_row - top_row + 1
+        new_dims_y = right_column - left_column + 1
+        mask_x = []
+        mask_y = []
+        for i in range(self.grid_dims[0]):
+            if top_row <= i - math.floor(self.grid_dims[0] / 2) <= bottom_row:
+                mask_x.append(False)
+            else:
+                mask_x.append(True)
+        for i in range(self.grid_dims[1]):
+            if left_column <= i - math.floor(self.grid_dims[1] / 2) <= right_column:
+                mask_y.append(False)
+            else:
+                mask_y.append(True)
+        self.occupancy_matrix = numpy.compress(mask_x, self.occupancy_matrix, axis=0)
+        self.occupancy_matrix = numpy.compress(mask_y, self.occupancy_matrix, axis=1)
+        # Roll matrix over to correct for negative index offset
+        print(top_row)
+        print(bottom_row)
+        print(left_column)
+        print(right_column)
+        self.occupancy_matrix = numpy.roll(self.occupancy_matrix,
+                                           (-top_row - math.floor(new_dims_x / 2),
+                                            -left_column - math.floor(new_dims_y / 2)),
+                                           axis=(0, 1))
+        numpy.set_printoptions(threshold=numpy.inf)
+        print(numpy.matrix(self.occupancy_matrix).round())
+        self.grid_dims[0] = new_dims_x
+        self.grid_dims[1] = new_dims_y
+        # Reset own position
+        self.estimated_x = 0
+        self.estimated_y = 0
+        self.visited.clear()

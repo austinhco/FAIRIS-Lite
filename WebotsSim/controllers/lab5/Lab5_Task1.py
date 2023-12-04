@@ -61,7 +61,7 @@ emoo.target_size = [1.5, 0.5]  # [Height, Diameter]
 # Localization info NOTE: Cells are organized such that UP/NORTH is NEGATIVE
 emoo.grid_dims = [42, 42]
 emoo.cell_len = 0.2
-emoo.true_map_dims = [22, 22]
+emoo.true_map_dims = [21, 21]
 # emoo.landmarks = [[[1, 1, 0], [-2, 2]],
 #                   [[0, 1, 0], [-2, -2]],
 #                   [[1, 0, 0], [2, 2]],
@@ -97,6 +97,8 @@ for j in range(emoo.grid_dims[1]):
 emoo.advance()
 # World can be changed on line 18
 emoo.navigate_occupancy()
+emoo.print_grid()
+emoo.compress_occupancy_matrix()
 emoo.print_grid()
 # Advance time
 emoo.advance()
