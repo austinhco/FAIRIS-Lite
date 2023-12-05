@@ -1286,6 +1286,7 @@ class Emoo(RosBot):
         current_cell = self.coord_to_cell(self.estimated_x, self.estimated_y)
         for i in range(1, inc + 1):
             cell = [current_cell[0] - i, current_cell[1]]
+            # TODO: Try/Except out of bounds error for each can_go_x
             if self.guess_occupied(cell[0], cell[1]) or self.cell_visited(cell):
                 return False
         return True
@@ -1491,11 +1492,62 @@ class Emoo(RosBot):
         for cell in empties:
             matrix[cell[0]][cell[1]] = 0
         readable_matrix = list(zip(*matrix[::-1]))
-        readable_matrix = numpy.roll(readable_matrix, (-min_y, min_x), axis=(0, 1)).round()
+        readable_matrix = numpy.roll(readable_matrix, (-min_y, min_x), axis=(0, 1))
         readable_matrix = numpy.flip(readable_matrix, axis=1)
         readable_occupancy = numpy.transpose(numpy.roll(self.occupancy_matrix.round(),
                                                         (-math.floor(self.grid_dims[0] / 2) - 1,
                                                         -math.floor(self.grid_dims[1] / 2) - 1), (0, 1)))
         # By comparing readable_matrix and readable_occupancy, we can identify the best match
         # where readable_matrix is a submatrix or readable_occupancy
+        print(readable_matrix.round())
+        print(readable_occupancy.round())
+        rows_dif = len(readable_occupancy) - len(readable_matrix)
+        cols_dif = len(readable_occupancy[0]) - len(readable_matrix[0])
+        best_match_matrix = []  # top left corner
+        best_match_ratio = 0
+        for j in range(rows_dif + 1):
+            for i in range(cols_dif + 1):
+                # Get submatrix of occupancy matrix
+                mask_x = []
+                mask_y = []
+                for x in range(self.grid_dims[0]):
+                    if i <= x < i + x_dim:
+                        mask_x.append(True)
+                    else:
+                        mask_x.append(False)
+                for y in range(self.grid_dims[1]):
+                    if j <= y < j + y_dim:
+                        mask_y.append(True)
+                    else:
+                        mask_y.append(False)
+                submatrix = numpy.compress(mask_y, readable_occupancy, axis=0)
+                submatrix = numpy.compress(mask_x, submatrix, axis=1)
+                print(submatrix)
+                # Get the ratio of matching cells on submatrix vs measurementss
+                matched = 0
+                mismatched = 0
+                for x in range(x_dim):
+                    for y in range(y_dim):
+                        measured = readable_matrix[y][x]
+                        mapped = submatrix[y][x]
+                        if measured == 0.5:
+                            continue
+                        if measured == mapped:
+                            matched += 1
+                        else:
+                            mismatched += 1
+                ratio = matched / (matched + mismatched)
+                if ratio > best_match_ratio:
+                    best_match_matrix = [i, j]
+                    best_match_ratio = ratio
+        print(best_match_ratio)
+        print(best_match_matrix)
+        best_cell_x = best_match_matrix[0] - min_x - math.floor(self.grid_dims[0] / 2)
+        best_cell_y = -(best_match_matrix[1] - min_y - math.floor(self.grid_dims[1] / 2))
+        print(best_cell_x, best_cell_y)
+        # Convert to coordinates and update estimated position
+        best_pos_x = best_cell_x * self.cell_len
+        best_pos_y = best_cell_y * self.cell_len
+        self.estimated_x = best_pos_x
+        self.estimated_y = best_pos_y
 
