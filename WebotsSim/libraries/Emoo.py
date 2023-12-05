@@ -1439,6 +1439,13 @@ class Emoo(RosBot):
         # Reset own position
         self.estimated_x = 0
         self.estimated_y = 0
+        # Compress presence grid to correct size
+        self.cell_probs = []
+        for j in range(self.grid_dims[1]):
+            position_row = []
+            for i in range(self.grid_dims[0]):
+                position_row.append(0.5)
+            self.cell_probs.append(position_row)
 
     # Export occupancy matrix. Should be used to export finished maps.
     def export_map(self, path):
@@ -1454,6 +1461,12 @@ class Emoo(RosBot):
             with open(f"{path}/map_{map_hash}.pkl", "rb") as inp:
                 self.occupancy_matrix = pickle.load(inp)
             self.grid_dims = self.true_map_dims
+            self.cell_probs = []
+            for j in range(self.grid_dims[1]):
+                position_row = []
+                for i in range(self.grid_dims[0]):
+                    position_row.append(0.5)
+                self.cell_probs.append(position_row)
         else:
             print(f"Could not locate file {path}/map_{map_hash}.pkl.")
 
@@ -1499,8 +1512,6 @@ class Emoo(RosBot):
                                                         -math.floor(self.grid_dims[1] / 2) - 1), (0, 1)))
         # By comparing readable_matrix and readable_occupancy, we can identify the best match
         # where readable_matrix is a submatrix or readable_occupancy
-        print(readable_matrix.round())
-        print(readable_occupancy.round())
         rows_dif = len(readable_occupancy) - len(readable_matrix)
         cols_dif = len(readable_occupancy[0]) - len(readable_matrix[0])
         best_match_matrix = []  # top left corner
@@ -1522,7 +1533,6 @@ class Emoo(RosBot):
                         mask_y.append(False)
                 submatrix = numpy.compress(mask_y, readable_occupancy, axis=0)
                 submatrix = numpy.compress(mask_x, submatrix, axis=1)
-                print(submatrix)
                 # Get the ratio of matching cells on submatrix vs measurementss
                 matched = 0
                 mismatched = 0
@@ -1540,14 +1550,9 @@ class Emoo(RosBot):
                 if ratio > best_match_ratio:
                     best_match_matrix = [i, j]
                     best_match_ratio = ratio
-        print(best_match_ratio)
-        print(best_match_matrix)
         best_cell_x = best_match_matrix[0] - min_x - math.floor(self.grid_dims[0] / 2)
-        best_cell_y = -(best_match_matrix[1] - min_y - math.floor(self.grid_dims[1] / 2))
-        print(best_cell_x, best_cell_y)
-        # Convert to coordinates and update estimated position
-        best_pos_x = best_cell_x * self.cell_len
-        best_pos_y = best_cell_y * self.cell_len
-        self.estimated_x = best_pos_x
-        self.estimated_y = best_pos_y
-
+        best_cell_y = best_match_matrix[1] - min_y - math.floor(self.grid_dims[1] / 2)
+        # Update cell presence probabilities
+        self.update_cell_prob(best_cell_x + math.floor(self.grid_dims[0] / 2), best_cell_y + math.floor(self.grid_dims[1] / 2), best_match_ratio)
+        self.normalize_probs()
+        self.guess_cell()
