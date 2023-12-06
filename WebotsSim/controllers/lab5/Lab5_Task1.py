@@ -17,7 +17,7 @@ emoo = Emoo()
 
 # reset robot position
 # Loads the environment from the maze file
-maze_file = 'worlds/mazes/Labs/Lab4/Lab4_Task2_2.xml'
+maze_file = 'worlds/mazes/Labs/Lab4/Lab4_Task2_1.xml'
 emoo.load_environment(maze_file)
 emoo.move_to_start()
 
@@ -103,10 +103,11 @@ emoo.advance()
 # emoo.compress_occupancy_matrix()
 # emoo.print_grid()
 # emoo.export_map("maps")
-emoo.import_map("maps", "4932221063189498849")
+emoo.import_map("maps", "-7479042608062892327")
 # emoo.set_start_coords()
-emoo.print_grid()
 emoo.occupancy_guess_pos()
-emoo.print_grid()
+while 1:
+    emoo.navigate_occupancy(True)
+    emoo.advance()
 # Advance time
 emoo.advance()

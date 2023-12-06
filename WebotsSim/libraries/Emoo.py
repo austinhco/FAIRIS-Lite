@@ -83,6 +83,7 @@ class Emoo(RosBot):
     occupied = set([])  # list of obstacle cells
     previous_moves = []  # list of prior cell movements
     occupancy_matrix = []  # occupancy matrix for full grid
+    wave_front = []  # wave front matrix
 
     # Override stop function to add state update
     def stop(self):
@@ -225,7 +226,7 @@ class Emoo(RosBot):
         return self.get_front_right_motor_encoder_reading() - self.initial_fre
 
     # Move forward a given distance (in m), calculated via sensor readings, NOT TIME
-    def move_linear(self, distance):
+    def move_linear(self, distance, measure=True):
         current_ae = (self.relative_fre() + self.relative_fle()) / 2
         if self.noisy:
             # Print wheel velocities and time estimate
@@ -236,7 +237,8 @@ class Emoo(RosBot):
         self.set_left_motors_velocity(self.speed_pref)
         self.move_until(current_ae, distance)
         self.stop()
-        self.measure_occupancy_radial(self.measure_steps)
+        if measure:
+            self.measure_occupancy_radial(self.measure_steps)
 
     # Move in an arc a given distance (m) with a certain radius (m) - clock direction
     # will be determined by sign of radius:
@@ -824,64 +826,64 @@ class Emoo(RosBot):
         return tuple([x, y])
 
     # Navigate one cell in any particular direction
-    def move_cell_left(self):
+    def move_cell_left(self, measure=True):
         self.rotate_to(180)
-        self.move_linear(self.cell_len)
+        self.move_linear(self.cell_len, measure)
         self.visited.add(self.coord_to_cell(self.estimated_x, self.estimated_y))
         self.previous_moves.append('L')
         self.print_grid()
 
-    def move_cells_left(self, n):
+    def move_cells_left(self, n, measure=True):
         for i in range(n):
-            self.move_cell_left()
+            self.move_cell_left(measure)
 
-    def move_cell_right(self):
+    def move_cell_right(self, measure=True):
         self.rotate_to(0)
-        self.move_linear(self.cell_len)
+        self.move_linear(self.cell_len, measure)
         self.visited.add(self.coord_to_cell(self.estimated_x, self.estimated_y))
         self.previous_moves.append('R')
         self.print_grid()
 
-    def move_cells_right(self, n):
+    def move_cells_right(self, n, measure=True):
         for i in range(n):
-            self.move_cell_right()
+            self.move_cell_right(measure)
 
-    def move_cell_up(self):
+    def move_cell_up(self, measure=True):
         self.rotate_to(90)
-        self.move_linear(self.cell_len)
+        self.move_linear(self.cell_len, measure)
         self.visited.add(self.coord_to_cell(self.estimated_x, self.estimated_y))
         self.previous_moves.append('U')
         self.print_grid()
 
-    def move_cells_up(self, n):
+    def move_cells_up(self, n, measure=True):
         for i in range(n):
-            self.move_cell_up()
+            self.move_cell_up(measure)
 
-    def move_cell_down(self):
+    def move_cell_down(self, measure=True):
         self.rotate_to(270)
-        self.move_linear(self.cell_len)
+        self.move_linear(self.cell_len, measure)
         self.visited.add(self.coord_to_cell(self.estimated_x, self.estimated_y))
         self.previous_moves.append('D')
         self.print_grid()
 
-    def move_cells_down(self, n):
+    def move_cells_down(self, n, measure=True):
         for i in range(n):
-            self.move_cell_down()
+            self.move_cell_down(measure)
 
     # Undo last known cell movement and return what it was
-    def undo_last_cell_move(self):
+    def undo_last_cell_move(self, measure=True):
         if len(self.previous_moves) < 1:
             return
         last = self.previous_moves[len(self.previous_moves) - 1]
         self.previous_moves.pop()
         if last == 'L':
-            self.move_cell_right()
+            self.move_cell_right(measure)
         elif last == 'R':
-            self.move_cell_left()
+            self.move_cell_left(measure)
         elif last == 'U':
-            self.move_cell_down()
+            self.move_cell_down(measure)
         elif last == 'D':
-            self.move_cell_up()
+            self.move_cell_up(measure)
         self.previous_moves.pop()
         return last
 
@@ -1098,20 +1100,20 @@ class Emoo(RosBot):
         y = current[1] - math.floor(self.grid_dims[1] / 2)
         if dir == 'N':
             self.move_cell_up()
-            self.update_cell_prob(x, y, 0.2, True)
-            self.update_cell_prob(x, y - 1, 0.8, True)
+            self.update_cell_prob(x, y, 0.1, True)
+            self.update_cell_prob(x, y - 1, 0.9, True)
         elif dir == 'E':
             self.move_cell_right()
-            self.update_cell_prob(x, y, 0.2, True)
-            self.update_cell_prob(x + 1, y, 0.8, True)
+            self.update_cell_prob(x, y, 0.1, True)
+            self.update_cell_prob(x + 1, y, 0.9, True)
         elif dir == 'S':
             self.move_cell_down()
-            self.update_cell_prob(x, y, 0.2, True)
-            self.update_cell_prob(x, y + 1, 0.8, True)
+            self.update_cell_prob(x, y, 0.1, True)
+            self.update_cell_prob(x, y + 1, 0.9, True)
         elif dir == 'W':
             self.move_cell_left()
-            self.update_cell_prob(x, y, 0.2, True)
-            self.update_cell_prob(x - 1, y, 0.8, True)
+            self.update_cell_prob(x, y, 0.1, True)
+            self.update_cell_prob(x - 1, y, 0.9, True)
         self.normalize_probs()
         self.guess_cell()
 
@@ -1319,7 +1321,7 @@ class Emoo(RosBot):
         return True
 
     # This will implement navigate_grid for a subcell grid using occupancy grids
-    def navigate_occupancy(self):
+    def navigate_occupancy(self, force=False):
         inc = math.floor(1 / self.cell_len)
         start = self.coord_to_cell(self.estimated_x, self.estimated_y)
         left = [start[0] - inc, start[1]]
@@ -1327,38 +1329,39 @@ class Emoo(RosBot):
         down = [start[0], start[1] + inc]
         right = [start[0] + inc, start[1]]
         # Continue until the true map is known to at least 99.9%
-        while self.known_ratio() < 0.999:
-            self.measure_occupancy_radial(self.measure_steps)
+        while self.known_ratio() < 0.999 or force:
+            if not force:
+                self.measure_occupancy_radial(self.measure_steps)
             cell = self.coord_to_cell(self.estimated_x, self.estimated_y)
             self.visited.add(cell)
             # Same thing as before, but move in increments of inc
             if self.can_go_left():
-                self.move_cells_left(inc)
+                self.move_cells_left(inc, not force)
                 left[0] -= inc
                 up[0] -= inc
                 down[0] -= inc
                 right[0] -= inc
             elif self.can_go_up():
-                self.move_cells_up(inc)
+                self.move_cells_up(inc, not force)
                 left[1] -= inc
                 up[1] -= inc
                 down[1] -= inc
                 right[1] -= inc
             elif self.can_go_down():
-                self.move_cells_down(inc)
+                self.move_cells_down(inc, not force)
                 left[1] += inc
                 up[1] += inc
                 down[1] += inc
                 right[1] += inc
             elif self.can_go_right():
-                self.move_cells_right(inc)
+                self.move_cells_right(inc, not force)
                 left[0] += inc
                 up[0] += inc
                 down[0] += inc
                 right[0] += inc
             else:
                 for i in range(inc):
-                    last = self.undo_last_cell_move()
+                    last = self.undo_last_cell_move(not force)
                     if last == 'L':
                         left[0] += 1
                         up[0] += 1
@@ -1462,11 +1465,15 @@ class Emoo(RosBot):
                 self.occupancy_matrix = pickle.load(inp)
             self.grid_dims = self.true_map_dims
             self.cell_probs = []
+            self.wave_front = []
             for j in range(self.grid_dims[1]):
                 position_row = []
+                wave_row = []
                 for i in range(self.grid_dims[0]):
                     position_row.append(0.5)
+                    wave_row.append(-1)
                 self.cell_probs.append(position_row)
+                self.wave_front.append(wave_row)
         else:
             print(f"Could not locate file {path}/map_{map_hash}.pkl.")
 
@@ -1547,12 +1554,23 @@ class Emoo(RosBot):
                         else:
                             mismatched += 1
                 ratio = matched / (matched + mismatched)
-                if ratio > best_match_ratio:
-                    best_match_matrix = [i, j]
-                    best_match_ratio = ratio
-        best_cell_x = best_match_matrix[0] - min_x - math.floor(self.grid_dims[0] / 2)
-        best_cell_y = best_match_matrix[1] - min_y - math.floor(self.grid_dims[1] / 2)
+                # if ratio > best_match_ratio:
+                #     best_match_matrix = [i, j]
+                #     best_match_ratio = ratio
+                cell_x = i - min_x - math.floor(self.grid_dims[0] / 2)
+                cell_y = j - min_y - math.floor(self.grid_dims[1] / 2)
+                self.update_cell_prob(cell_x + math.floor(self.grid_dims[0] / 2), cell_y + math.floor(self.grid_dims[1] / 2), ratio)
+        # best_cell_x = best_match_matrix[0] - min_x - math.floor(self.grid_dims[0] / 2)
+        # best_cell_y = best_match_matrix[1] - min_y - math.floor(self.grid_dims[1] / 2)
         # Update cell presence probabilities
-        self.update_cell_prob(best_cell_x + math.floor(self.grid_dims[0] / 2), best_cell_y + math.floor(self.grid_dims[1] / 2), best_match_ratio)
+        # self.update_cell_prob(best_cell_x + math.floor(self.grid_dims[0] / 2), best_cell_y + math.floor(self.grid_dims[1] / 2), best_match_ratio)
         self.normalize_probs()
         self.guess_cell()
+
+    # Create a wave front for path planning
+    def create_wave_front(self, goal_x, goal_y):
+        e = 1
+
+    # Recursive component for wave front generation
+    def update_wave(self, cell_x, cell_y):
+        e = 1
